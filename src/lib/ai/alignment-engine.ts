@@ -37,7 +37,7 @@ export async function checkAlignment(
     ];
   }
 
-  const orchestrator = new AIOrchestrator({ userId: options.userId });
+  const orchestrator = new AIOrchestrator({ userId: options.userId, supabase });
   const response = await orchestrator.generate({
     projectId,
     taskType: "quality_check",

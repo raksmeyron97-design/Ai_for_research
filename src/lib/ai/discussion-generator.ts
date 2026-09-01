@@ -51,7 +51,7 @@ export async function generateDiscussion(
 
   const context = buildContext(project.title, results.content, objectives?.content ?? null, citations);
 
-  const orchestrator = new AIOrchestrator({ userId: options.userId });
+  const orchestrator = new AIOrchestrator({ userId: options.userId, supabase });
   const response = await orchestrator.generate({
     projectId,
     taskType: "discussion",

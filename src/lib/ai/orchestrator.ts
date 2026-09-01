@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { AllProvidersFailedError, AIProviderError, withRetry } from "./errors";
 import { buildNoDatasetResponse, requiresDataset } from "./integrity-guard";
 import { getMaxOutputTokens } from "./model-config";
@@ -9,6 +10,8 @@ import type { AIChunk, AIRequest, AIResponse } from "./types";
 
 interface OrchestratorOptions {
   userId?: string;
+  /** When passed, usage records persist to `ai_usage` (Phase 10) instead of only logging. */
+  supabase?: SupabaseClient;
 }
 
 async function callProvider(
@@ -71,7 +74,8 @@ export class AIOrchestrator {
 
       const fallback = resolveFallback(primary.providerName, classification.complexity);
       if (!fallback) {
-        recordUsage(
+        await recordUsage(
+          this.options.supabase,
           buildUsageRecord({
             projectId: request.projectId,
             userId: this.options.userId,
@@ -96,7 +100,8 @@ export class AIOrchestrator {
             ? fallbackErr
             : new AIProviderError(fallback.providerName, (fallbackErr as Error).message, true, fallbackErr);
         attempts.push(fallbackError);
-        recordUsage(
+        await recordUsage(
+          this.options.supabase,
           buildUsageRecord({
             projectId: request.projectId,
             userId: this.options.userId,
@@ -113,7 +118,8 @@ export class AIOrchestrator {
       }
     }
 
-    recordUsage(
+    await recordUsage(
+      this.options.supabase,
       buildUsageRecord({
         projectId: request.projectId,
         userId: this.options.userId,
@@ -200,7 +206,8 @@ export class AIOrchestrator {
         outputText += chunk.delta;
         yield chunk;
       }
-      recordUsage(
+      await recordUsage(
+        this.options.supabase,
         buildUsageRecord({
           projectId: request.projectId,
           userId: this.options.userId,
@@ -215,7 +222,8 @@ export class AIOrchestrator {
         }),
       );
     } catch (err) {
-      recordUsage(
+      await recordUsage(
+        this.options.supabase,
         buildUsageRecord({
           projectId: request.projectId,
           userId: this.options.userId,

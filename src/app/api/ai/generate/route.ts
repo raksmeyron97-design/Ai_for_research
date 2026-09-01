@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
 
-  const orchestrator = new AIOrchestrator({ userId });
+  const orchestrator = new AIOrchestrator({ userId, supabase });
 
   // Checked here too, not just inside AIOrchestrator.generate(): context
   // assembly (buildContext -> embedQuery) is real, billable work that a

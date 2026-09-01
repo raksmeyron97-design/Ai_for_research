@@ -54,7 +54,7 @@ API route → AIOrchestrator → TaskClassifier → Router → Gemini | OpenAI
 | `model-config.ts` | Reads model IDs and feature flags from `process.env` once; no model ID is hard-coded elsewhere in the app (§7) |
 | `prompt-manager.ts` + `prompts/*.ts` | Per-task-type system instructions (§22) — a handful are implemented (objectives, methodology, quality-check, literature) as the pattern; the rest of the 18 task types fall back to `prompts/default.ts` until their section generators are built in later phases |
 | `research-integrity-guard.ts` | Fixed instruction block appended to **every** system instruction: never fabricate participants/results/statistics/citations, label claims with an evidence status, refuse to invent empirical results with no dataset present (§15, §18, §19, §59) |
-| `token-manager.ts` | `estimateTokens` (character-based fallback), `calculateCost` (per-model USD/1M-token table, defaults for unknown models), `buildUsageRecord`/`recordUsage` (currently logs structured JSON; Phase 10 swaps the sink to a DB table without touching call sites) |
+| `token-manager.ts` | `estimateTokens` (character-based fallback), `calculateCost` (per-model USD/1M-token table, defaults for unknown models), `buildUsageRecord`/`recordUsage` (persists to `ai_usage` when a Supabase client is passed — Phase 10, §2j — falls back to a structured console log otherwise) |
 | `errors.ts` | `AIProviderError` (retryable flag), `AllProvidersFailedError`, `withRetry()` — timeout + exponential backoff, retries only when a failure is marked retryable |
 | `orchestrator.ts` | `AIOrchestrator.generate()` / `.stream()` — the single entry point every API route calls. Classifies → routes → calls provider → on failure, falls back to the other provider once → records token usage on every outcome (success or failure) → optionally runs a second-model verification pass, but only for tasks in an explicit high-risk list or when `requireVerification` is set (§6: never dual-call by default) |
 | `request-schema.ts` | Zod schema validating every inbound AI request at the API boundary |
@@ -430,6 +430,44 @@ Summary:
   fidelity — no PDF rasterizer was available to screenshot rendered
   pages.
 
+## 2j. What exists now (Phase 10)
+
+Full detail lives in [`AI_ADMIN_ANALYTICS.md`](./AI_ADMIN_ANALYTICS.md).
+Summary — this is the last phase in the spec's original sequence:
+
+- **`recordUsage()` finally persists to `ai_usage`** instead of only
+  logging — `AIOrchestrator` now takes an optional `supabase` client and
+  every one of its 8 real call sites passes the request-scoped one it
+  already had. Writes use the `authenticated` client under the Phase 5
+  RLS insert policy, not an admin client.
+- **`isAdminEmail()`**: a minimal `ADMIN_EMAILS` env allowlist — no roles
+  table, deliberately, until a second admin-gated feature justifies one.
+- **`createAdminClient()`**: the service-role client `.env.example` and
+  `lib/supabase/server.ts` have both been pointing at since Phase 0/1
+  ("used only for trusted server-side jobs, e.g. admin analytics
+  aggregation") — bypasses RLS, only ever used after `isAdminEmail()`
+  passes.
+- **`compileAdminAnalytics()`**: aggregates totals/breakdowns/daily usage
+  from the most recent `MAX_USAGE_ROWS` (5,000) `ai_usage` rows plus
+  project counts — one bounded query shape, not separate lifetime-total
+  and recent-activity paths. `/admin` (server component, `notFound()`
+  for non-admins) + `GET /api/admin/analytics` (`403` for non-admins).
+- **Two real bugs found only by loading the real page against the real
+  local Supabase stack** (invisible to typecheck/lint/test/build): (1)
+  `service_role` had no table grants either — the same class of gap the
+  Phase 5 migration fixed for `authenticated`, now fixed for
+  `service_role` too via a new migration; (2) `compileAdminAnalytics()`
+  wasn't checking `.error` on any query, so bug #1's permission-denied
+  errors were silently rendered as a healthy-looking, all-zero dashboard
+  — the worst failure mode for a monitoring tool. Fixed by throwing a
+  dedicated `AdminAnalyticsError` instead.
+- **30 new unit tests** (274 total), plus real verification: two real
+  users via the real Auth API (one admin, one not), a real project, a
+  real (intentionally failing, no AI keys) `/api/ai/generate` call
+  confirmed to persist a real `ai_usage` row, and every number on the
+  reloaded dashboard checked against that real data. Non-admin access
+  confirmed denied for real (`404` page, `403` API), not just in theory.
+
 ## 3. Explicitly out of scope for this pass (N/A / deferred)
 
 These spec sections describe later phases and were **not** built now —
@@ -448,8 +486,9 @@ listed here so it's clear what "Phase 1 done" does and doesn't include:
   `needsWeb` in the classifier, but no provider-side grounding tool is
   wired up.
 - Alignment engine, questionnaire builder, data analysis, discussion/
-  conclusion engines, admin analytics dashboard (§20, §25–34). Export
-  (§52) is now built — see §2i.
+  conclusion engines (§20, §25–34) are now built — see §2e-§2h. Export
+  (§52) is now built — see §2i. Admin analytics is now built — see §2j.
+  Every phase in the spec's original sequence is now implemented.
 - Front-matter document structure (§21's Cover/Declaration/
   Acknowledgement/Abstract/List of Tables/List of Figures) — not
   exportable because none of it exists as data in this schema; would
@@ -484,11 +523,9 @@ listed here so it's clear what "Phase 1 done" does and doesn't include:
   point-in-time examples** (verified against provider docs during this
   build) and will drift — both providers ship new model generations
   frequently. Re-verify before relying on cost figures for budgeting.
-- **`ai_usage` table exists (Phase 2) but nothing writes to it yet** —
-  `recordUsage()` in `token-manager.ts` still only logs to stdout.
-  `AIOrchestrator` doesn't currently hold a request-scoped Supabase
-  client, so wiring this is a small but real follow-up, not just a
-  schema gap anymore.
+- ~~`ai_usage` table exists (Phase 2) but nothing writes to it yet~~
+  **Fixed** (Phase 10, §2j): `recordUsage()` persists to `ai_usage` via a
+  Supabase client now threaded through `AIOrchestrator`.
 - ~~RLS policies are unverified~~ **Verified** (Phase 5, once Docker
   became available): `supabase start` locally, two real users through the
   real Auth API, real cross-user REST/RPC/storage requests — see
@@ -499,7 +536,10 @@ listed here so it's clear what "Phase 1 done" does and doesn't include:
   correctness — invisible without a real database. pgvector/HNSW search
   was also confirmed working with a real 768-dim embedding, and the
   fix's `alter default privileges` clause prevents the same gap from
-  recurring on tables added by future migrations.
+  recurring on tables added by future migrations. **The same gap
+  recurred for `service_role`** (Phase 10, §2j) — found the same way,
+  loading the real admin analytics page — and was fixed with the same
+  pattern in a second migration.
 - **Document processing is synchronous, with no background job queue**
   (Phase 3 — deliberate for now, see `AI_RAG_ARCHITECTURE.md`). A large
   upload means a slow HTTP response; a crashed request mid-processing
@@ -582,13 +622,23 @@ Following the spec's phase order:
    front-matter pages (no data for them yet — see §3), page numbers/TOC
    in the generated files, exporting a single section instead of the
    whole project.
-9. Phase 10 (admin analytics) as scoped in the spec, as its own
-   reviewable slice.
+9. ~~Phase 10 — Admin Analytics~~ **done**: `recordUsage()` now persists
+   to `ai_usage`, an env-allowlist admin check (no roles table — see
+   §2j), a service-role admin client, and a `/admin` dashboard
+   aggregating usage/cost/project activity across every researcher
+   (§2j). Two real bugs — a missing `service_role` table grant and
+   `compileAdminAnalytics()` silently swallowing the resulting errors as
+   "0 activity" — were found and fixed by loading the real page against
+   the real local Supabase stack. Remaining loose ends: no roles table
+   (single env-var allowlist is deliberately minimal for now), totals
+   cap at the most recent 5,000 `ai_usage` rows rather than true lifetime
+   totals, no historical trend charts beyond the current daily-usage
+   strip.
 
-Phase 10 (admin analytics) is the only remaining phase from the spec's
-original sequence. Unlike Phases 2-9, it's operator/admin-facing rather
-than part of the researcher's own workflow, so it doesn't block or get
-blocked by anything a researcher does in their own project.
+Every phase in the spec's original sequence (Phases 0 through 10) is now
+implemented. What's left is the loose ends listed under each phase above
+— none of them block using the app end-to-end — plus whatever new work
+the spec's author decides to scope next.
 
 **A capability that changed mid-project, worth remembering for later
 phases**: a real Docker daemon and the Supabase CLI became available

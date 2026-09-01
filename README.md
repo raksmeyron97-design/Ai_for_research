@@ -53,14 +53,19 @@ never touches, a statistical-test guard — see
 (Discussion/Conclusion generators with hard guards against discussing or
 concluding from findings that don't exist yet — see
 [`docs/AI_DISCUSSION_CONCLUSION.md`](./docs/AI_DISCUSSION_CONCLUSION.md)),
-and Phase 9 (DOCX/PDF/Markdown export of the full research chain, with a
+Phase 9 (DOCX/PDF/Markdown export of the full research chain, with a
 reference list built from real saved citations and a full questionnaire-
 instrument appendix — see
-[`docs/AI_DOCUMENT_EXPORT.md`](./docs/AI_DOCUMENT_EXPORT.md))
-are implemented. The auth/dashboard/editor golden path, RLS across every
-table, every phase's data-integrity constraints, and every export format
-have all been verified against a real local Supabase instance (Docker)
-and a real running server; the AI provider calls themselves have not,
-since no real Gemini/OpenAI keys are available in this build
-environment. The only remaining phase (admin analytics) is not yet
-built — see the audit doc for details.
+[`docs/AI_DOCUMENT_EXPORT.md`](./docs/AI_DOCUMENT_EXPORT.md)), and
+Phase 10 (an admin analytics dashboard at `/admin` covering AI usage,
+cost, and project activity across every researcher — see
+[`docs/AI_ADMIN_ANALYTICS.md`](./docs/AI_ADMIN_ANALYTICS.md)) are all
+implemented — every phase in the original spec sequence now exists. The
+auth/dashboard/editor golden path, RLS (and, since Phase 10, the
+service-role grants the admin dashboard needs) across every table, every
+phase's data-integrity constraints, every export format, and the admin
+dashboard's real numbers against real seeded data have all been verified
+against a real local Supabase instance (Docker) and a real running
+server; the AI provider calls themselves have not, since no real
+Gemini/OpenAI keys are available in this build environment. See the
+audit doc for the loose ends still open within each phase.

@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     });
   }
 
-  const orchestrator = new AIOrchestrator({ userId });
+  const orchestrator = new AIOrchestrator({ userId, supabase });
   const encoder = new TextEncoder();
   let assistantContent = "";
 

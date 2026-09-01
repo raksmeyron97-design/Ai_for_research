@@ -44,7 +44,7 @@ export async function generateResultsAnalysis(
 
   const context = buildAnalysisContext(project.title, objectives?.content ?? null, summary);
 
-  const orchestrator = new AIOrchestrator({ userId: options.userId });
+  const orchestrator = new AIOrchestrator({ userId: options.userId, supabase });
   const response = await orchestrator.generate({
     projectId,
     taskType: "results_generation",

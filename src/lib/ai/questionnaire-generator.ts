@@ -45,7 +45,7 @@ export async function generateQuestionnaire(
 
   const context = await buildQuestionnaireContext(supabase, projectId, project);
 
-  const orchestrator = new AIOrchestrator({ userId: options.userId });
+  const orchestrator = new AIOrchestrator({ userId: options.userId, supabase });
   const response = await orchestrator.generate({
     projectId,
     taskType: "questionnaire",

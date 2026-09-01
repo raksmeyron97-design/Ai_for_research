@@ -1,3 +1,4 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ProviderName, TaskType, TokenUsage } from "./types";
 
 export interface UsageRecord {
@@ -41,17 +42,36 @@ export function calculateCost(model: string, usage: TokenUsage): number {
 }
 
 /**
- * In Phase 1 this logs a structured record for observability. Phase 10
- * (analytics) persists these to an AIUsage table for the admin dashboard —
- * swap the sink here without touching call sites.
+ * Persists to the `ai_usage` table (Phase 10) when a request-scoped
+ * Supabase client is available — the admin analytics dashboard reads from
+ * this table. Falls back to a structured console log when no client is
+ * passed (e.g. contexts without a request, or tests), so this never
+ * becomes a hard requirement to call the orchestrator. Insert failures are
+ * swallowed after logging: usage tracking must never break the actual AI
+ * response it's recording.
  */
-export function recordUsage(record: UsageRecord): void {
-  console.log(
-    JSON.stringify({
-      type: "ai_usage",
-      ...record,
-    }),
-  );
+export async function recordUsage(supabase: SupabaseClient | undefined, record: UsageRecord): Promise<void> {
+  if (!supabase) {
+    console.log(JSON.stringify({ type: "ai_usage", ...record }));
+    return;
+  }
+
+  const { error } = await supabase.from("ai_usage").insert({
+    project_id: record.projectId,
+    user_id: record.userId ?? null,
+    task_type: record.taskType,
+    provider: record.provider,
+    model: record.model,
+    input_tokens: record.inputTokens,
+    output_tokens: record.outputTokens,
+    estimated_cost_usd: record.estimatedCostUsd,
+    latency_ms: record.latencyMs,
+    success: record.success,
+    fallback: record.fallback,
+  });
+  if (error) {
+    console.error(JSON.stringify({ type: "ai_usage_persist_failed", error: error.message, ...record }));
+  }
 }
 
 export function buildUsageRecord(params: {

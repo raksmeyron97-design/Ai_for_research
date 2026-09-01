@@ -86,25 +86,30 @@ export default function AdminDashboard({ initialSummary }: { initialSummary: Adm
         <SummaryCard label="AI Calls" value={summary.totals.totalCalls.toLocaleString()} />
         <SummaryCard
           label="Total Cost"
-          value={formatUsd(summary.totals.totalCostUsd)}
+          value={formatUsd(summary.totals.authoritativeCostUsd)}
           hint={
-            summary.totals.measuredTokenRate >= 0.99
-              ? "Estimated from provider-reported tokens, not billed"
-              : `Estimated, not billed — only ${formatPercent(summary.totals.measuredTokenRate)} of calls have provider-reported tokens`
+            summary.totals.measuredTokenRate >= 0.99 && summary.totals.verifiedCostRate >= 0.99
+              ? "Provider-reported tokens at verified rates, not billed"
+              : `Covers only the ${formatPercent(
+                  Math.min(summary.totals.measuredTokenRate, summary.totals.verifiedCostRate),
+                )} of calls that are both measured and verifiably priced`
           }
         />
         <SummaryCard label="Success Rate" value={formatPercent(summary.totals.successRate)} />
         <SummaryCard label="Fallback Rate" value={formatPercent(summary.totals.fallbackRate)} />
       </section>
 
-      {summary.totals.totalCalls > 0 && summary.totals.measuredTokenRate < 0.99 && (
-        <p className="rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
-          {formatPercent(1 - summary.totals.measuredTokenRate)} of the analyzed calls have token counts estimated
-          from text length rather than reported by the provider, so the cost figures above are indicative rather
-          than exact. Calls logged before the streaming usage fix are all estimated; new streamed calls are
-          measured.
-        </p>
-      )}
+      {summary.totals.totalCalls > 0 &&
+        (summary.totals.measuredTokenRate < 0.99 || summary.totals.verifiedCostRate < 0.99) && (
+          <p className="rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+            The cost total covers only calls that are both measured and verifiably priced.{" "}
+            {formatPercent(1 - summary.totals.measuredTokenRate)} of analyzed calls have token counts estimated
+            from text length rather than reported by the provider, and{" "}
+            {formatPercent(1 - summary.totals.verifiedCostRate)} used a model with no verified rate on file, so
+            they contribute nothing to the figure above rather than contributing a guess. Calls logged before
+            Phase 16 are all in both categories.
+          </p>
+        )}
 
       <section>
         <h2 className="mb-2 text-sm font-medium">Daily AI usage</h2>

@@ -6,6 +6,7 @@ import { AIOrchestrator } from "@/lib/ai/orchestrator";
 import { resolveRequestContext } from "@/lib/ai/prepare-request";
 import { detectPromptInjection } from "@/lib/ai/prompt-injection-guard";
 import { aiRequestSchema } from "@/lib/ai/request-schema";
+import { isStreamTimeout } from "@/lib/ai/stream-guard";
 import type { AIRequest } from "@/lib/ai/types";
 import { checkRateLimit, RATE_LIMITS, rateLimitResponseBody } from "@/lib/security/rate-limit";
 import { createClient, requireUserId } from "@/lib/supabase/server";
@@ -102,8 +103,17 @@ export async function POST(req: Request) {
             controller.enqueue(encoder.encode(chunk.delta));
           }
         }
-      } catch {
-        controller.enqueue(encoder.encode("\n[AI response interrupted — please retry.]"));
+      } catch (err) {
+        // A stalled stream and a provider error are different failures and
+        // deserve different advice: one is worth retrying immediately, the
+        // other usually is not.
+        controller.enqueue(
+          encoder.encode(
+            isStreamTimeout(err)
+              ? "\n[The model stopped responding partway through. Nothing further was received — please retry.]"
+              : "\n[AI response interrupted — please retry.]",
+          ),
+        );
       } finally {
         // Phase 16 finding F3: this route returned model output with no
         // citation check at all, while quality-check and the discussion

@@ -5,12 +5,20 @@ import type { SectionType } from "../db/types";
 import { SECTION_LABELS } from "../db/types";
 import { verifyCitationsInText } from "./integrity-guard";
 import { AIOrchestrator } from "./orchestrator";
+import { parseAIJson } from "./parse-ai-json";
 import { QUALITY_CHECK_RESPONSE_JSON_SCHEMA, qualityCheckResponseSchema } from "./schemas";
 import type { QualityScoreBreakdown, ResearchWarning } from "./types";
 
 export interface QualityCheckResult {
   scores: QualityScoreBreakdown;
   issues: ResearchWarning[];
+  /**
+   * False when the scorer did not return a usable response. The zeroed
+   * `scores` are then placeholders, not a result — a project scoring 0 and a
+   * project whose scoring failed are the same shape otherwise, and only one
+   * of them is a judgement about the work (finding F10).
+   */
+  scoresAvailable: boolean;
   /** Always show this alongside the scores — never present them as an official grade (spec §33). */
   disclaimer: string;
 }
@@ -49,6 +57,7 @@ export async function runQualityCheck(
   if (!context) {
     return {
       scores: zeroScores(),
+      scoresAvailable: false,
       issues: [
         {
           severity: "informational",
@@ -71,10 +80,11 @@ export async function runQualityCheck(
     responseSchema: QUALITY_CHECK_RESPONSE_JSON_SCHEMA,
   });
 
-  const { scores, issues: aiIssues } = parseQualityResponse(response.content);
+  const { scores, scoresAvailable, issues: aiIssues } = parseQualityResponse(response.content);
 
   return {
     scores,
+    scoresAvailable,
     issues: [...structuralIssues, ...citationIssues, ...aiIssues].map((issue) => ({
       ...issue,
       section: issue.section || undefined,
@@ -109,20 +119,27 @@ function zeroScores(): QualityScoreBreakdown {
   return { methodology: 0, evidence: 0, alignment: 0, writing: 0, references: 0, dataIntegrity: 0, overall: 0 };
 }
 
-function parseQualityResponse(content: string): { scores: QualityScoreBreakdown; issues: ResearchWarning[] } {
-  try {
-    const parsed = qualityCheckResponseSchema.parse(JSON.parse(content));
-    return { scores: parsed.scores, issues: parsed.issues };
-  } catch {
+function parseQualityResponse(content: string): {
+  scores: QualityScoreBreakdown;
+  scoresAvailable: boolean;
+  issues: ResearchWarning[];
+} {
+  const result = parseAIJson({ raw: content, schema: qualityCheckResponseSchema, task: "quality check" });
+
+  if (!result.ok) {
     return {
       scores: zeroScores(),
+      scoresAvailable: false,
       issues: [
         {
-          severity: "low",
+          severity: "medium",
           category: "system",
-          message: "The automated quality scorer did not return a valid response. Scores shown are placeholders — review manually.",
+          message: `${result.message} No score was produced — the zeros shown are placeholders, not an assessment of this project.`,
+          recommendation: "Re-run the quality check rather than acting on the placeholder scores.",
         },
       ],
     };
   }
+
+  return { scores: result.data.scores, scoresAvailable: true, issues: result.data.issues };
 }

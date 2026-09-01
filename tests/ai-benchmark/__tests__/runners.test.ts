@@ -37,10 +37,26 @@ describe("run budget", () => {
 });
 
 describe("cost accounting", () => {
-  it("refuses to report a cost without a verified rate file", () => {
+  it("refuses to report a cost for a model nothing prices", () => {
     const cost = computeCost("gemini-x", 1000, 500, null);
     expect(cost.estimatedCostUsd).toBeNull();
-    expect(cost.rateSource).toBe("unverified_placeholder");
+    expect(cost.rateSource).toBe("unknown_model");
+  });
+
+  // Phase 16A: the app now carries verified rates, so the harness prices a
+  // known model without needing an operator rate file.
+  it("prices a known model from the application's verified rates", () => {
+    const cost = computeCost("gemini-3.6-flash", 1_000_000, 1_000_000, null);
+    expect(cost.rateSource).toBe("verified_app_pricing");
+    expect(cost.estimatedCostUsd).toBeCloseTo(0.75 + 3.75, 10);
+  });
+
+  it("lets an operator rate file override the built-in rate", () => {
+    const cost = computeCost("gemini-3.6-flash", 1_000_000, 0, {
+      "gemini-3.6-flash": { inputPerMillion: 99, outputPerMillion: 0 },
+    });
+    expect(cost.rateSource).toBe("verified_rate_file");
+    expect(cost.estimatedCostUsd).toBeCloseTo(99, 10);
   });
 
   it("computes cost from a verified rate file", () => {
@@ -50,7 +66,7 @@ describe("cost accounting", () => {
     expect(cost.rateSource).toBe("verified_rate_file");
   });
 
-  it("marks a model absent from the rate file rather than guessing", () => {
+  it("marks a model absent from both the rate file and the app rates rather than guessing", () => {
     const cost = computeCost("model-y", 100, 100, { "model-x": { inputPerMillion: 1, outputPerMillion: 1 } });
     expect(cost.estimatedCostUsd).toBeNull();
     expect(cost.rateSource).toBe("unknown_model");

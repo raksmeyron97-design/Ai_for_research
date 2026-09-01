@@ -8,10 +8,6 @@ function classification(overrides: Partial<TaskClassification> = {}): TaskClassi
     taskType: "chat",
     complexity: "standard",
     provider: "gemini",
-    needsWeb: false,
-    needsDocuments: false,
-    needsData: false,
-    needsCitations: false,
     ...overrides,
   };
 }

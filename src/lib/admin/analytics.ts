@@ -27,6 +27,7 @@ interface UsageRow {
   success: boolean;
   fallback: boolean;
   tokens_measured: boolean;
+  cost_confidence: string;
   created_at: string;
 }
 
@@ -90,6 +91,15 @@ export interface AdminAnalyticsSummary {
      * (finding F6).
      */
     measuredTokenRate: number;
+    /**
+     * Share of analyzed calls priced from a rate verified against the
+     * provider's published pricing. Cost is only authoritative where both
+     * this and `measuredTokenRate` hold: measured tokens at an invented
+     * price is as wrong as estimated tokens at a real one (finding F7).
+     */
+    verifiedCostRate: number;
+    /** Cost total restricted to calls that are both measured and verifiably priced. */
+    authoritativeCostUsd: number;
   };
   projectsByStatus: Record<string, number>;
   byProvider: ProviderBreakdown[];
@@ -118,7 +128,7 @@ export async function compileAdminAnalytics(admin: SupabaseClient): Promise<Admi
     admin
       .from("ai_usage")
       .select(
-        "id, task_type, provider, model, estimated_cost_usd, input_tokens, output_tokens, latency_ms, success, fallback, tokens_measured, created_at",
+        "id, task_type, provider, model, estimated_cost_usd, input_tokens, output_tokens, latency_ms, success, fallback, tokens_measured, cost_confidence, created_at",
       )
       .order("created_at", { ascending: false })
       .limit(MAX_USAGE_ROWS),
@@ -150,6 +160,10 @@ export async function compileAdminAnalytics(admin: SupabaseClient): Promise<Admi
   const successCount = rows.filter((r) => r.success).length;
   const fallbackCount = rows.filter((r) => r.fallback).length;
   const measuredCount = rows.filter((r) => r.tokens_measured).length;
+  const verifiedCostCount = rows.filter((r) => r.cost_confidence === "verified").length;
+  const authoritativeCostUsd = rows
+    .filter((r) => r.tokens_measured && r.cost_confidence === "verified")
+    .reduce((sum, r) => sum + r.estimated_cost_usd, 0);
 
   const byProviderMap = new Map<
     string,
@@ -256,6 +270,8 @@ export async function compileAdminAnalytics(admin: SupabaseClient): Promise<Admi
       successRate: totalCalls > 0 ? successCount / totalCalls : 0,
       fallbackRate: totalCalls > 0 ? fallbackCount / totalCalls : 0,
       measuredTokenRate: totalCalls > 0 ? measuredCount / totalCalls : 0,
+      verifiedCostRate: totalCalls > 0 ? verifiedCostCount / totalCalls : 0,
+      authoritativeCostUsd,
     },
     projectsByStatus,
     byProvider,

@@ -31,10 +31,6 @@ const classifierMock = vi.hoisted(() => ({
     taskType: "data_analysis" as const,
     complexity: "advanced" as const,
     provider: "gemini" as const,
-    needsWeb: false,
-    needsDocuments: false,
-    needsData: true,
-    needsCitations: false,
   })),
   needsVerification: vi.fn(() => false),
 }));
@@ -98,10 +94,6 @@ describe("AIOrchestrator dataset guard", () => {
       taskType: "chat",
       complexity: "standard",
       provider: "gemini",
-      needsWeb: false,
-      needsDocuments: false,
-      needsData: false,
-      needsCitations: false,
     });
     providerGenerate.mockResolvedValueOnce({ content: "hi", provider: "gemini", model: "gemini-3.6-flash" });
 

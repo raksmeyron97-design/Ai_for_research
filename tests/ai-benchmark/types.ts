@@ -156,7 +156,7 @@ export interface TokenAccounting {
 export interface CostAccounting {
   estimatedCostUsd: number | null;
   /** Where the per-token rate came from. Cost is meaningless without this. */
-  rateSource: "verified_rate_file" | "unverified_placeholder" | "unknown_model";
+  rateSource: "verified_rate_file" | "verified_app_pricing" | "unknown_model";
 }
 
 export interface ExecutionRecord {

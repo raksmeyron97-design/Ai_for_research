@@ -31,7 +31,7 @@ function execution(overrides: Partial<ExecutionRecord> = {}): ExecutionRecord {
     ok: true,
     output: "Prevalence was 21.4% among urban health centre attendees [sok2024antenatal].",
     tokens: { inputTokens: 500, outputTokens: 100, totalTokens: 600, retrievedContextTokens: 400, promptTokens: 480, fromProvider: true },
-    cost: { estimatedCostUsd: null, rateSource: "unverified_placeholder" },
+    cost: { estimatedCostUsd: null, rateSource: "verified_app_pricing" },
     failureType: null,
     errorMessage: null,
     ...overrides,
@@ -142,7 +142,7 @@ describe("report generation", () => {
   it("produces a machine-readable report with the Step 25 keys", () => {
     const summary = summarize([scored()]);
     const report = buildReport({
-      runId: "run_test", suite: "smoke", commit: "abc1234", status: "NOT READY",
+      runId: "run_test", suite: "smoke", plannedCalls: 1, commit: "abc1234", status: "NOT READY",
       statuses, summaries: [summary], results: [scored()], failures: [],
       recommendations: ["r"], caveats: ["c"],
     });
@@ -162,7 +162,7 @@ describe("report generation", () => {
     tmpDirs.push(dir);
     const summary = summarize([scored()]);
     const report = buildReport({
-      runId: "run_test", suite: "smoke", commit: null, status: "NOT READY",
+      runId: "run_test", suite: "smoke", plannedCalls: 1, commit: null, status: "NOT READY",
       statuses, summaries: [summary], results: [scored()], failures: [], recommendations: [], caveats: [],
     });
 
@@ -175,7 +175,7 @@ describe("report generation", () => {
   it("renders caveats above the results so no number is quoted without them", () => {
     const summary = summarize([scored()]);
     const report = buildReport({
-      runId: "run_test", suite: "smoke", commit: null, status: "NOT READY",
+      runId: "run_test", suite: "smoke", plannedCalls: 1, commit: null, status: "NOT READY",
       statuses, summaries: [summary], results: [scored()], failures: [],
       recommendations: [], caveats: ["**This run is MOCKED.**"],
     });
@@ -188,7 +188,7 @@ describe("report generation", () => {
 
   it("states plainly when there is nothing to report", () => {
     const report = buildReport({
-      runId: "run_test", suite: "smoke", commit: null, status: "NOT READY",
+      runId: "run_test", suite: "smoke", plannedCalls: 1, commit: null, status: "NOT READY",
       statuses, summaries: [], results: [], failures: [], recommendations: [], caveats: [],
     });
     expect(renderMarkdown(report, [])).toContain("Nothing about model quality can be concluded");
@@ -200,7 +200,7 @@ describe("recommendations when nothing was measured", () => {
     // Guards the wording fix: a LIVE preflight with zero successful
     // executions must not be reported as "set your API key".
     const liveButFailed = buildReport({
-      runId: "r", suite: "smoke", commit: null, status: "NOT READY",
+      runId: "r", suite: "smoke", plannedCalls: 0, commit: null, status: "NOT READY",
       statuses, summaries: [], results: [], failures: [],
       recommendations: [
         "No live model measurement exists despite a working credential for gemini: every generation call failed.",
@@ -209,5 +209,49 @@ describe("recommendations when nothing was measured", () => {
     });
     expect(liveButFailed.recommendations[0]).not.toContain("Set GEMINI_API_KEY");
     expect(liveButFailed.recommendations[0]).toContain("working credential");
+  });
+});
+
+
+describe("run completeness", () => {
+  it("marks a run complete when nothing was skipped", () => {
+    const report = buildReport({
+      runId: "r", suite: "smoke", plannedCalls: 1, commit: null, status: "NOT READY",
+      statuses, summaries: [], results: [scored()], failures: [], recommendations: [], caveats: [],
+    });
+    expect(report.completeness.status).toBe("complete");
+    expect(report.completeness.skippedCalls).toBe(0);
+  });
+
+  it("marks a run partial and names the ceiling that truncated it", () => {
+    const skippedResult = scored({
+      ok: false,
+      output: "",
+      mode: "UNAVAILABLE",
+      attempts: 0,
+      errorMessage: "skipped: request ceiling reached (12)",
+    });
+
+    const report = buildReport({
+      runId: "r", suite: "full", plannedCalls: 5, commit: null, status: "NOT READY",
+      statuses, summaries: [], results: [scored(), skippedResult], failures: [], recommendations: [], caveats: [],
+    });
+
+    expect(report.completeness.status).toBe("partial");
+    expect(report.completeness.skippedCalls).toBe(1);
+    expect(report.completeness.reason).toContain("request ceiling");
+  });
+
+  it("says PARTIAL in the markdown, above the scores", () => {
+    const skippedResult = scored({ ok: false, output: "", attempts: 0, errorMessage: "skipped: run cancelled" });
+    const summary = summarize([scored()]);
+    const report = buildReport({
+      runId: "r", suite: "full", plannedCalls: 2, commit: null, status: "NOT READY",
+      statuses, summaries: [summary], results: [scored(), skippedResult], failures: [], recommendations: [], caveats: [],
+    });
+
+    const markdown = renderMarkdown(report, [summary]);
+    expect(markdown).toContain("PARTIAL");
+    expect(markdown.indexOf("PARTIAL")).toBeLessThan(markdown.indexOf("## Overall"));
   });
 });

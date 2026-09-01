@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { getModelRate } from "@/lib/ai/pricing";
 import type { ProviderName } from "@/lib/ai/types";
 import type { CostAccounting } from "./types";
 
@@ -95,13 +96,9 @@ export interface ModelRate {
 }
 
 /**
- * Cost is only as trustworthy as the rate table behind it. This project has
- * no verified pricing source checked in — `src/lib/ai/token-manager.ts`'s
- * RATE_TABLE is explicitly labelled a placeholder — so unless the operator
- * points AI_BENCH_RATE_FILE at rates they have verified against the
- * providers' own pricing pages, every cost figure is tagged
- * `unverified_placeholder` and must be read as an order-of-magnitude
- * sanity check, not a budget.
+ * An operator-supplied rate file, which overrides the in-repo verified rates.
+ * Useful for enterprise/negotiated pricing, or to price a model
+ * `src/lib/ai/pricing.ts` does not yet cover.
  */
 export function loadRates(rateFile: string | null): Record<string, ModelRate> | null {
   if (!rateFile) return null;
@@ -115,6 +112,15 @@ export function loadRates(rateFile: string | null): Record<string, ModelRate> | 
   }
 }
 
+/**
+ * Cost for one benchmark call.
+ *
+ * Since Phase 16A the application carries verified provider rates
+ * (`src/lib/ai/pricing.ts`, each entry sourced and dated), so the benchmark
+ * prices runs by default instead of reporting nothing. An operator rate file
+ * still wins where supplied. A model neither source prices gets no dollar
+ * figure at all — never a default-rate guess.
+ */
 export function computeCost(
   model: string,
   inputTokens: number | undefined,
@@ -125,14 +131,25 @@ export function computeCost(
     return { estimatedCostUsd: null, rateSource: "unknown_model" };
   }
 
-  const rate = rates?.[model];
-  if (!rate) {
-    return { estimatedCostUsd: null, rateSource: rates ? "unknown_model" : "unverified_placeholder" };
+  const perMillion = (tokens: number | undefined, price: number) => ((tokens ?? 0) / 1_000_000) * price;
+
+  const override = rates?.[model];
+  if (override) {
+    return {
+      estimatedCostUsd:
+        perMillion(inputTokens, override.inputPerMillion) + perMillion(outputTokens, override.outputPerMillion),
+      rateSource: "verified_rate_file",
+    };
   }
 
-  const cost =
-    ((inputTokens ?? 0) / 1_000_000) * rate.inputPerMillion +
-    ((outputTokens ?? 0) / 1_000_000) * rate.outputPerMillion;
+  const verified = getModelRate(model);
+  if (verified) {
+    return {
+      estimatedCostUsd:
+        perMillion(inputTokens, verified.inputPerMillion) + perMillion(outputTokens, verified.outputPerMillion),
+      rateSource: "verified_app_pricing",
+    };
+  }
 
-  return { estimatedCostUsd: cost, rateSource: "verified_rate_file" };
+  return { estimatedCostUsd: null, rateSource: "unknown_model" };
 }

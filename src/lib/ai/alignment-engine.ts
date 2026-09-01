@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { SECTION_LABELS } from "../db/types";
 import { getProject } from "../db/projects";
 import { listSections } from "../db/sections";
+import { parseAIJson } from "./parse-ai-json";
 import { ALIGNMENT_RESPONSE_JSON_SCHEMA, alignmentResponseSchema } from "./schemas";
 import { AIOrchestrator } from "./orchestrator";
 import type { ResearchWarning } from "./types";
@@ -61,24 +62,29 @@ function formatChainForReview(
     .join("\n\n");
 }
 
+/**
+ * Controlled "did not complete" state. A malformed response must never read
+ * as "no issues found": an empty issue list is the same shape as a clean
+ * bill of health, so the failure is reported as its own issue instead
+ * (finding F10).
+ */
 function parseAlignmentResponse(content: string): ResearchWarning[] {
-  try {
-    const parsed = alignmentResponseSchema.parse(JSON.parse(content));
-    return parsed.issues.map((issue) => ({
-      ...issue,
-      section: issue.section || undefined,
-      recommendation: issue.recommendation || undefined,
-    }));
-  } catch {
-    // A malformed response is itself worth surfacing, not swallowing —
-    // the researcher should know the automated check didn't run cleanly
-    // rather than silently seeing "no issues found."
+  const result = parseAIJson({ raw: content, schema: alignmentResponseSchema, task: "alignment check" });
+
+  if (!result.ok) {
     return [
       {
-        severity: "low",
+        severity: "medium",
         category: "system",
-        message: "The automated alignment check did not return a valid response. Review the chain manually.",
+        message: `${result.message} The alignment check did not complete — review the chain manually rather than treating this as "no issues found".`,
+        recommendation: "Re-run the alignment check; if it keeps failing, the model is not honouring the response schema.",
       },
     ];
   }
+
+  return result.data.issues.map((issue) => ({
+    ...issue,
+    section: issue.section || undefined,
+    recommendation: issue.recommendation || undefined,
+  }));
 }

@@ -11,6 +11,13 @@ export interface BenchmarkReport {
   timestamp: string;
   commit: string | null;
   suite: string;
+  /**
+   * Whether every planned call actually ran. A run truncated by a budget
+   * ceiling or a cancellation reports fewer scenarios than the suite
+   * defines, and its aggregate scores cover only what ran — that must be
+   * visible, not inferred from a count.
+   */
+  completeness: { status: "complete" | "partial"; plannedCalls: number; skippedCalls: number; reason: string | null };
   execution_modes: Record<string, number>;
   providers: Record<string, ProviderStatus>;
   overall_scores: Record<string, number | null>;
@@ -31,6 +38,7 @@ function keyFor(summary: ModelSummary): string {
 export function buildReport(params: {
   runId: string;
   suite: string;
+  plannedCalls: number;
   commit: string | null;
   status: BenchmarkReport["status"];
   statuses: ProviderStatus[];
@@ -43,6 +51,9 @@ export function buildReport(params: {
   const modes: Record<string, number> = {};
   for (const r of params.results) modes[r.execution.mode] = (modes[r.execution.mode] ?? 0) + 1;
 
+  const skipped = params.results.filter((r) => r.execution.errorMessage?.startsWith("skipped:"));
+  const skipReason = skipped[0]?.execution.errorMessage?.replace(/^skipped:\s*/, "") ?? null;
+
   return {
     phase: 16,
     status: params.status,
@@ -51,6 +62,12 @@ export function buildReport(params: {
     timestamp: new Date().toISOString(),
     commit: params.commit,
     suite: params.suite,
+    completeness: {
+      status: skipped.length > 0 ? "partial" : "complete",
+      plannedCalls: params.plannedCalls,
+      skippedCalls: skipped.length,
+      reason: skipped.length > 0 ? skipReason : null,
+    },
     execution_modes: modes,
     providers: Object.fromEntries(params.statuses.map((s) => [s.provider, s])),
     overall_scores: Object.fromEntries(params.summaries.map((s) => [keyFor(s), s.overall])),

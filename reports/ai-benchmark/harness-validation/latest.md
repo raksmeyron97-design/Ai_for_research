@@ -1,14 +1,15 @@
 # AI Benchmark — latest run
 
 - **Status:** NOT READY
-- **Run:** `run_2026-09-01T10-33-02-270Z_0340dab9` (suite: full, benchmark v16.0.0)
-- **Commit:** e9d4079
-- **Timestamp:** 2026-09-01T10:33:02.391Z
+- **Run:** `run_2026-09-01T11-08-25-323Z_8431c81a` (suite: full, benchmark v16.0.0)
+- **Commit:** 68aa3fa
+- **Timestamp:** 2026-09-01T11:08:25.448Z
+- **Completeness:** complete (366 planned calls, none skipped)
 - **Execution modes:** MOCKED=366
 
 > **Read this before quoting any number below.**
 > - **This run is MOCKED.** Every response came from the deterministic stub in `runners/stub-provider.ts`, not from a model. It validates the harness, and says nothing whatsoever about Gemini or OpenAI quality.
-> - **Cost figures are unavailable.** No verified rate file was supplied (`AI_BENCH_RATE_FILE`), so no USD figure is reported rather than one derived from the placeholder rates in `src/lib/ai/token-manager.ts`.
+> - **No cost figure for stub-deterministic-v1.** Neither `src/lib/ai/pricing.ts` nor any supplied rate file prices these models, so they contribute nothing to the cost totals rather than contributing a guess.
 
 ## Provider status
 
@@ -104,8 +105,8 @@
 | n | 15 | 15 | 168 | 168 |
 | min | 0 ms | 0 ms | 0 ms | 0 ms |
 | median | 0 ms | 0 ms | 0 ms | 0 ms |
-| p95 | 1 ms | 1 ms | 1 ms | 1 ms |
-| max | 1 ms | 1 ms | 1 ms | 1 ms |
+| p95 | 1 ms | 0 ms | 1 ms | 1 ms |
+| max | 1 ms | 0 ms | 1 ms | 1 ms |
 
 ## Tokens and cost
 
@@ -119,7 +120,7 @@
 | Usage from provider / estimated | 15 / 0 | 15 / 0 | 168 / 0 | 168 / 0 |
 | Cost per request | n/a | n/a | n/a | n/a |
 | Cost per successful answer | n/a | n/a | n/a | n/a |
-| Rate source | unverified_placeholder | unverified_placeholder | unverified_placeholder | unverified_placeholder |
+| Rate source | unknown_model | unknown_model | unknown_model | unknown_model |
 | Quality per 1K tokens | 120.0 | 120.0 | 181.5 | 181.5 |
 
 ## Failures

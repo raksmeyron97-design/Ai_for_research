@@ -51,7 +51,16 @@ describe("extractCitationKeys", () => {
   });
 
   it("de-duplicates repeated keys", () => {
-    expect(extractCitationKeys("[a] then again [a] and [b]")).toEqual(["a", "b"]);
+    expect(extractCitationKeys("[who2024] then again [who2024] and [smith2023]")).toEqual([
+      "who2024",
+      "smith2023",
+    ]);
+  });
+
+  // Phase 16A / F11: single letters and bare numbers are list markers, not
+  // citation keys. See citation-grammar.test.ts for the full grammar.
+  it("no longer treats a one- or two-character token as a citation key", () => {
+    expect(extractCitationKeys("[a] then [b] and [ii]")).toEqual([]);
   });
 
   it("returns an empty array when there are no bracketed keys", () => {

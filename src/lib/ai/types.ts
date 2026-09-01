@@ -80,6 +80,30 @@ export interface TokenUsage {
   cachedInputTokens?: number;
 }
 
+export type CostConfidence = "verified" | "unverified";
+
+/**
+ * Normalized usage + cost for one AI call. Cost fields are populated only
+ * when the model has a verified rate in `pricing.ts`; otherwise they are
+ * absent and `costConfidence` is `"unverified"`, so a caller cannot read a
+ * dollar amount that no source backs (finding F7).
+ */
+export interface AIUsage {
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens?: number;
+  cachedInputTokens?: number;
+  totalTokens?: number;
+
+  inputCostUsd?: number;
+  outputCostUsd?: number;
+  reasoningCostUsd?: number;
+  cachedInputCostUsd?: number;
+
+  totalCostUsd?: number;
+  costConfidence: CostConfidence;
+}
+
 export interface Citation {
   citationKey: string;
   title?: string;
@@ -221,8 +245,4 @@ export interface TaskClassification {
   taskType: TaskType;
   complexity: ModelTier;
   provider: ProviderName;
-  needsWeb: boolean;
-  needsDocuments: boolean;
-  needsData: boolean;
-  needsCitations: boolean;
 }

@@ -13,19 +13,21 @@ describe("estimateTokens", () => {
 });
 
 describe("calculateCost", () => {
-  it("returns 0 for a request with no tokens", () => {
+  it("returns 0 for a priced model with no tokens", () => {
     expect(calculateCost("gemini-3.6-flash", {})).toBe(0);
   });
 
-  it("scales linearly with token count for a known model", () => {
-    const small = calculateCost("gemini-3.6-flash", { inputTokens: 1_000_000, outputTokens: 0 });
-    const large = calculateCost("gemini-3.6-flash", { inputTokens: 2_000_000, outputTokens: 0 });
+  it("scales linearly with token count for a verified model", () => {
+    const small = calculateCost("gemini-3.6-flash", { inputTokens: 1_000_000, outputTokens: 0 })!;
+    const large = calculateCost("gemini-3.6-flash", { inputTokens: 2_000_000, outputTokens: 0 })!;
     expect(large).toBeCloseTo(small * 2);
   });
 
-  it("falls back to the default rate for an unrecognized model", () => {
-    const cost = calculateCost("some-future-model", { inputTokens: 1_000_000, outputTokens: 0 });
-    expect(cost).toBeGreaterThan(0);
+  // Phase 16A / F7: an unknown model used to be charged at an invented
+  // DEFAULT_RATE, producing a number that looked as authoritative as a real
+  // one. It now returns null so callers must handle "we don't know".
+  it("returns null for a model with no verified rate", () => {
+    expect(calculateCost("some-future-model", { inputTokens: 1_000_000, outputTokens: 0 })).toBeNull();
   });
 });
 

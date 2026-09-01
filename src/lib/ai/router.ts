@@ -1,5 +1,5 @@
 import { AIConfigError } from "./errors";
-import { AI_FEATURE_FLAGS, getTierConfig } from "./model-config";
+import { AI_FEATURE_FLAGS, getTierConfig, getTierModelForProvider } from "./model-config";
 import { GeminiProvider } from "./providers/gemini";
 import { OpenAIProvider } from "./providers/openai";
 import type { AIProvider, ModelTier, ProviderName, TaskClassification } from "./types";
@@ -52,36 +52,44 @@ export function resolveProvider(classification: TaskClassification): RoutingDeci
     );
   }
 
-  // Cross-provider fallback for the same tier intent (Section 37): e.g. if
-  // Gemini is disabled for a "standard" task, use OpenAI's standard-ish tier.
-  const fallbackTier: ModelTier = tier === "advanced" ? "advanced" : "standard";
-  const fallbackConfig = getTierConfig(fallbackTier).provider === fallbackName
-    ? getTierConfig(fallbackTier)
-    : { provider: fallbackName, model: getTierConfig("advanced").model };
+  const model = getTierModelForProvider(tier, fallbackName);
+  if (!model) {
+    throw new AIConfigError(
+      `${primary.provider} is disabled and ${fallbackName} has no model configured for the "${tier}" tier. ` +
+        `Set the matching model env var, or re-enable ${primary.provider}.`,
+    );
+  }
 
   return {
     provider: PROVIDERS[fallbackName],
     providerName: fallbackName,
-    model: fallbackConfig.model,
+    model,
     tier,
     isFallback: true,
   };
 }
 
-/** Explicit runtime fallback used by the orchestrator when the primary call itself fails (not disabled, just erroring). */
+/**
+ * Runtime fallback after the primary call itself failed (as opposed to the
+ * provider being disabled). Preserves the task's tier: a `simple` task falls
+ * back to the other provider's `simple` model, never to its most capable one.
+ *
+ * Returns null — meaning "no fallback, report the original failure" — when
+ * the other provider is disabled or has no model configured at this tier.
+ * Callers attempt this once and never re-enter it, so there is no fallback
+ * chain to loop.
+ */
 export function resolveFallback(failedProvider: ProviderName, tier: ModelTier): RoutingDecision | null {
   const fallbackName = otherProvider(failedProvider);
   if (!isEnabled(fallbackName)) return null;
 
-  const fallbackTier: ModelTier = tier === "advanced" ? "advanced" : "standard";
-  const config = getTierConfig(fallbackTier).provider === fallbackName
-    ? getTierConfig(fallbackTier)
-    : { provider: fallbackName, model: getTierConfig("advanced").model };
+  const model = getTierModelForProvider(tier, fallbackName);
+  if (!model) return null;
 
   return {
     provider: PROVIDERS[fallbackName],
     providerName: fallbackName,
-    model: config.model,
+    model,
     tier,
     isFallback: true,
   };

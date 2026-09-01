@@ -50,6 +50,7 @@ export default function QualityCheckPanel({
   const [result, setResult] = useState<{
     scores: QualityScoreBreakdown;
     issues: Issue[];
+    scoresAvailable: boolean;
     disclaimer: string;
   } | null>(null);
 
@@ -99,14 +100,26 @@ export default function QualityCheckPanel({
           <div className="flex-1 overflow-y-auto">
             <p className="mb-3 text-xs italic text-neutral-500">{result.disclaimer}</p>
 
-            <div className="mb-4 grid grid-cols-2 gap-2">
-              {SCORE_LABELS.map(([key, label]) => (
-                <div key={key} className="rounded border border-neutral-200 p-2">
-                  <p className="text-xs text-neutral-500">{label}</p>
-                  <p className="text-lg font-semibold">{Math.round(result.scores[key])}</p>
-                </div>
-              ))}
-            </div>
+            {/*
+              A failed scorer returns zeros, which are the same shape as a
+              genuine score of 0. Showing them as numbers would read as a
+              damning assessment of the project rather than a check that did
+              not run (Phase 16A, F10).
+            */}
+            {result.scoresAvailable ? (
+              <div className="mb-4 grid grid-cols-2 gap-2">
+                {SCORE_LABELS.map(([key, label]) => (
+                  <div key={key} className="rounded border border-neutral-200 p-2">
+                    <p className="text-xs text-neutral-500">{label}</p>
+                    <p className="text-lg font-semibold">{Math.round(result.scores[key])}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mb-4 rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
+                No scores were produced for this run — see the issues below. This is not a score of zero.
+              </p>
+            )}
 
             <h3 className="mb-2 text-sm font-medium">Issues ({result.issues.length})</h3>
             <ul className="space-y-2">

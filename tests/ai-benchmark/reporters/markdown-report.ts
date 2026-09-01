@@ -48,6 +48,11 @@ export function renderMarkdown(report: BenchmarkReport, summaries: ModelSummary[
   lines.push(`- **Commit:** ${report.commit ?? "unknown"}`);
   lines.push(`- **Timestamp:** ${report.timestamp}`);
   lines.push(
+    report.completeness.status === "complete"
+      ? `- **Completeness:** complete (${report.completeness.plannedCalls} planned calls, none skipped)`
+      : `- **Completeness:** \`PARTIAL\` — ${report.completeness.skippedCalls} of ${report.completeness.plannedCalls} planned calls were skipped (${report.completeness.reason}). Scores below cover only what ran.`,
+  );
+  lines.push(
     `- **Execution modes:** ${Object.entries(report.execution_modes)
       .map(([mode, n]) => `${mode}=${n}`)
       .join(", ") || "none"}`,

@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import type { ProviderName } from "@/lib/ai/types";
 import { applyConcisenessScores, collectFailures, overallStatus, summarize, type ModelSummary } from "./aggregate";
-import { loadConfig, loadRates, type BenchmarkConfig } from "./config";
+import { loadConfig, type BenchmarkConfig } from "./config";
 import { scoreExecution } from "./evaluators";
 import { judgeResponse, pickJudge } from "./evaluators/llm-judge";
 import { buildScenarioContext } from "./fixtures/context";
@@ -66,9 +66,16 @@ function buildCaveats(config: BenchmarkConfig, statuses: ProviderStatus[], resul
     );
   }
 
-  if (!loadRates(config.rateFile)) {
+  const unpricedModels = [
+    ...new Set(
+      results
+        .filter((r) => r.execution.ok && r.execution.cost.rateSource === "unknown_model")
+        .map((r) => r.execution.model),
+    ),
+  ];
+  if (unpricedModels.length > 0) {
     caveats.push(
-      "**Cost figures are unavailable.** No verified rate file was supplied (`AI_BENCH_RATE_FILE`), so no USD figure is reported rather than one derived from the placeholder rates in `src/lib/ai/token-manager.ts`.",
+      `**No cost figure for ${unpricedModels.join(", ")}.** Neither \`src/lib/ai/pricing.ts\` nor any supplied rate file prices these models, so they contribute nothing to the cost totals rather than contributing a guess.`,
     );
   }
 
@@ -266,6 +273,7 @@ export async function runBenchmark(overrides: Partial<BenchmarkConfig> = {}): Pr
     const report = buildReport({
       runId,
       suite: config.suite,
+      plannedCalls: units.length,
       commit: commitSha(),
       status,
       statuses,

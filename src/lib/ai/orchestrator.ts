@@ -5,6 +5,7 @@ import { getMaxOutputTokens } from "./model-config";
 import { buildPrompt, buildSystemInstruction } from "./prompt-manager";
 import { detectPromptInjection } from "./prompt-injection-guard";
 import { getReviewerProvider, resolveFallback, resolveProvider, type RoutingDecision } from "./router";
+import { getStreamIdleTimeoutMs, withIdleTimeout } from "./stream-guard";
 import { classifyTask, needsVerification } from "./task-classifier";
 import { buildUsageRecord, recordUsage } from "./token-manager";
 import type { AIChunk, AIRequest, AIResponse, TokenUsage } from "./types";
@@ -201,56 +202,107 @@ export class AIOrchestrator {
     const systemInstruction = buildSystemInstruction(request);
     const prompt = buildPrompt(request);
     const startedAt = Date.now();
-    let outputText = "";
-    // Carried out of the loop so the catch block can still record whatever
-    // the provider reported before it failed mid-stream.
-    let usage: TokenUsage | undefined;
+
+    // Tracked across the primary attempt so the fallback decision can be
+    // made on fact rather than hope: once a byte has reached the client we
+    // cannot restart on another provider without duplicating output.
+    const state = { outputText: "", usage: undefined as TokenUsage | undefined, emitted: false };
 
     try {
-      for await (const chunk of decision.provider.stream({
-        model: decision.model,
-        systemInstruction,
-        prompt,
-        maxOutputTokens: getMaxOutputTokens(),
+      yield* this.streamFrom(decision, systemInstruction, prompt, state);
+    } catch (primaryError) {
+      const fallback = state.emitted ? null : resolveFallback(decision.providerName, classification.complexity);
+
+      if (!fallback) {
+        // Either output already reached the client, or there is nowhere to
+        // fall back to. Record the failure — never as a partial success —
+        // and let the caller see the real error.
+        await this.recordStreamUsage(request, decision, prompt, state, startedAt, false);
+        throw primaryError;
+      }
+
+      // Nothing was emitted, so switching providers cannot duplicate a
+      // chunk. The failed attempt is still recorded: it consumed tokens.
+      await this.recordStreamUsage(request, decision, prompt, state, startedAt, false);
+
+      const fallbackState = { outputText: "", usage: undefined as TokenUsage | undefined, emitted: false };
+      const fallbackStartedAt = Date.now();
+      try {
+        yield* this.streamFrom(fallback, systemInstruction, prompt, fallbackState);
+      } catch (fallbackError) {
+        await this.recordStreamUsage(request, fallback, prompt, fallbackState, fallbackStartedAt, false);
+        throw fallbackError;
+      }
+      await this.recordStreamUsage(request, fallback, prompt, fallbackState, fallbackStartedAt, true);
+      return;
+    }
+
+    await this.recordStreamUsage(request, decision, prompt, state, startedAt, true);
+  }
+
+  /**
+   * One streaming attempt against one provider, guarded by an idle-gap
+   * timeout. The AbortController is what makes the timeout real: both
+   * adapters forward the signal to their SDK, so a stall cancels the
+   * in-flight request instead of abandoning it.
+   */
+  private async *streamFrom(
+    decision: RoutingDecision,
+    systemInstruction: string,
+    prompt: string,
+    state: { outputText: string; usage: TokenUsage | undefined; emitted: boolean },
+  ): AsyncIterable<AIChunk> {
+    const controller = new AbortController();
+
+    const source = decision.provider.stream!({
+      model: decision.model,
+      systemInstruction,
+      prompt,
+      maxOutputTokens: getMaxOutputTokens(),
+      signal: controller.signal,
+    });
+
+    try {
+      for await (const chunk of withIdleTimeout(source, {
+        idleMs: getStreamIdleTimeoutMs(),
+        provider: decision.providerName,
+        controller,
       })) {
-        outputText += chunk.delta;
-        usage = chunk.usage ?? usage;
+        state.outputText += chunk.delta;
+        state.usage = chunk.usage ?? state.usage;
+        if (chunk.delta) state.emitted = true;
         yield chunk;
       }
-      await recordUsage(
-        this.options.supabase,
-        buildUsageRecord({
-          projectId: request.projectId,
-          userId: this.options.userId,
-          taskType: request.taskType,
-          provider: decision.providerName,
-          model: decision.model,
-          usage,
-          promptText: prompt,
-          outputText,
-          latencyMs: Date.now() - startedAt,
-          success: true,
-          fallback: decision.isFallback,
-        }),
-      );
-    } catch (err) {
-      await recordUsage(
-        this.options.supabase,
-        buildUsageRecord({
-          projectId: request.projectId,
-          userId: this.options.userId,
-          taskType: request.taskType,
-          provider: decision.providerName,
-          model: decision.model,
-          usage,
-          promptText: prompt,
-          outputText,
-          latencyMs: Date.now() - startedAt,
-          success: false,
-          fallback: decision.isFallback,
-        }),
-      );
-      throw err;
+    } finally {
+      // Covers the consumer abandoning the stream mid-iteration, which
+      // otherwise leaves the provider connection open.
+      controller.abort();
     }
+  }
+
+  private async recordStreamUsage(
+    request: AIRequest,
+    decision: RoutingDecision,
+    prompt: string,
+    state: { outputText: string; usage: TokenUsage | undefined },
+    startedAt: number,
+    success: boolean,
+  ): Promise<void> {
+    await recordUsage(
+      this.options.supabase,
+      buildUsageRecord({
+        projectId: request.projectId,
+        userId: this.options.userId,
+        taskType: request.taskType,
+        provider: decision.providerName,
+        model: decision.model,
+        usage: state.usage,
+        promptText: prompt,
+        outputText: state.outputText,
+        latencyMs: Date.now() - startedAt,
+        success,
+        fallback: decision.isFallback,
+      }),
+    );
   }
 }

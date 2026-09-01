@@ -9,6 +9,7 @@ import type {
   ResearchInstrumentRow,
 } from "../db/types";
 import { AIOrchestrator } from "./orchestrator";
+import { AIJsonParseError, parseAIJsonOrThrow } from "./parse-ai-json";
 import { QUESTIONNAIRE_RESPONSE_JSON_SCHEMA, questionnaireResponseSchema } from "./schemas";
 
 export class QuestionnaireGenerationError extends Error {
@@ -111,24 +112,23 @@ async function buildQuestionnaireContext(
   return parts.join("\n\n");
 }
 
+/**
+ * Hard failure, no persistence. Unlike the alignment and quality checks —
+ * which degrade to a "did not complete" state — this writes instrument and
+ * question rows, so a partially valid response must abort before any insert.
+ * Half a questionnaire in the database is worse than none (finding F10).
+ */
 function parseQuestionnaireResponse(content: string) {
-  let json: unknown;
   try {
-    json = JSON.parse(content);
+    return parseAIJsonOrThrow({
+      raw: content,
+      schema: questionnaireResponseSchema,
+      task: "questionnaire",
+    });
   } catch (err) {
-    throw new QuestionnaireGenerationError(
-      "The model did not return valid JSON for the questionnaire. Nothing was saved — try again.",
-      err,
-    );
+    if (err instanceof AIJsonParseError) {
+      throw new QuestionnaireGenerationError(`${err.message} Nothing was saved — try again.`, err);
+    }
+    throw err;
   }
-
-  const result = questionnaireResponseSchema.safeParse(json);
-  if (!result.success) {
-    throw new QuestionnaireGenerationError(
-      `The generated questionnaire failed validation (${result.error.issues[0]?.message ?? "unknown reason"}). Nothing was saved — try again.`,
-      result.error,
-    );
-  }
-
-  return result.data;
 }

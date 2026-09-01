@@ -10,13 +10,15 @@ function makeRequest(overrides: Partial<AIRequest> = {}): AIRequest {
   };
 }
 
-describe("classifyTask", () => {
-  beforeEach(() => {
-    delete process.env.AI_ENABLE_GEMINI;
-    delete process.env.AI_ENABLE_OPENAI;
-    delete process.env.AI_ENABLE_WEB_GROUNDING;
-  });
+// File-level, not per-describe: a test that disables a provider used to leak
+// that setting into the next describe block, which only stayed hidden because
+// of the order tests happened to run in.
+beforeEach(() => {
+  delete process.env.AI_ENABLE_GEMINI;
+  delete process.env.AI_ENABLE_OPENAI;
+});
 
+describe("classifyTask", () => {
   it("routes cheap tasks to the simple tier on gemini", () => {
     const result = classifyTask(makeRequest({ taskType: "rewrite" }));
     expect(result.complexity).toBe("simple");
@@ -29,14 +31,12 @@ describe("classifyTask", () => {
     expect(result.provider).toBe("openai");
   });
 
-  it("does not request document context when no documentIds are given", () => {
-    const result = classifyTask(makeRequest({ taskType: "literature_review" }));
-    expect(result.needsDocuments).toBe(false);
-  });
-
-  it("requests document context when documentIds are given", () => {
+  // Phase 16A / F4: classifyTask used to return needsWeb / needsDocuments /
+  // needsData / needsCitations, which nothing read. They are gone; the
+  // classifier's contract is now tier + provider only.
+  it("returns only the routing decision it is actually consulted for", () => {
     const result = classifyTask(makeRequest({ taskType: "literature_review", documentIds: ["doc1"] }));
-    expect(result.needsDocuments).toBe(true);
+    expect(Object.keys(result).sort()).toEqual(["complexity", "provider", "taskType"]);
   });
 
   it("falls back to gemini for advanced tasks when openai is disabled", () => {
@@ -45,13 +45,6 @@ describe("classifyTask", () => {
     expect(result.provider).toBe("gemini");
   });
 
-  it("only signals needsWeb when the feature flag is explicitly enabled", () => {
-    process.env.AI_ENABLE_WEB_GROUNDING = "true";
-    expect(classifyTask(makeRequest({ taskType: "literature_review" })).needsWeb).toBe(true);
-
-    process.env.AI_ENABLE_WEB_GROUNDING = "false";
-    expect(classifyTask(makeRequest({ taskType: "literature_review" })).needsWeb).toBe(false);
-  });
 });
 
 describe("needsVerification", () => {

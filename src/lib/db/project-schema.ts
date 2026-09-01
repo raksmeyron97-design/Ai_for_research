@@ -27,4 +27,18 @@ export const upsertSectionSchema = z.object({
   content: z.string().max(200_000).optional(),
   status: z.enum(["not_started", "in_progress", "completed"]).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+  /**
+   * How this change was made, for the version history (Phase 16 §18).
+   * Optional and defaulted to "manual": an ordinary autosave should not have
+   * to declare itself, but an accepted AI change must, so that provenance is
+   * recorded rather than inferred.
+   */
+  change: z
+    .object({
+      action: z.enum(["manual", "insert", "replace", "append", "ai_generate"]),
+      provider: z.string().max(40).optional(),
+      model: z.string().max(120).optional(),
+      sectionAction: z.string().max(60).optional(),
+    })
+    .optional(),
 });

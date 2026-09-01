@@ -1,8 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import AIChangeControl, { type ChangeAction } from "@/components/AIChangeControl";
+import SectionActions from "@/components/SectionActions";
+import type { SectionAction, SectionActionId } from "@/lib/ai/sections/actions";
 import { SECTION_LABELS } from "@/lib/db/types";
 import type { ResearchSectionRow, SectionStatus, SectionType } from "@/lib/db/types";
+
+interface PendingSuggestion {
+  text: string;
+  actionId: SectionActionId;
+  provider?: string;
+  model?: string;
+  warnings?: { severity: string; category: string; message: string }[];
+  contextLayers?: string[];
+}
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -37,6 +49,11 @@ export default function SectionEditor({
   // claim.
   const [metadata, setMetadata] = useState<Record<string, unknown>>(initialSection?.metadata ?? {});
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  // AI output waits here until the researcher decides what to do with it.
+  // Nothing reaches `content` without an explicit choice (§17).
+  const [pending, setPending] = useState<PendingSuggestion | null>(null);
+  const [busyAction, setBusyAction] = useState<SectionActionId | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   // Baseline to diff against, not an "is this the first effect run" flag —
   // a boolean ref for that purpose breaks under React Strict Mode's dev-only
   // double-invocation of effects (confirmed against a real Postgres
@@ -47,16 +64,71 @@ export default function SectionEditor({
   const initialContentRef = useRef(initialSection?.content ?? "");
   const initialStatusRef = useRef(initialSection?.status ?? "not_started");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Set when the next save originates from an accepted AI change (§18). */
+  const pendingChangeRef = useRef<{
+    action: ChangeAction;
+    provider?: string;
+    model?: string;
+    sectionAction?: string;
+  } | null>(null);
 
+  // Copilot output now goes through the same review step as a section
+  // action, rather than appending straight into the section.
   useEffect(() => {
     if (!insertRequest) return;
-    setContent((prev) => (prev ? `${prev}\n\n${insertRequest}` : insertRequest));
-    setMetadata((prev) => ({ ...prev, aiAssisted: true, lastAiInsertAt: new Date().toISOString() }));
+    setPending({ text: insertRequest, actionId: "generate" });
     onInsertConsumed?.();
     // insertRequest is intentionally the only dependency: onInsertConsumed
     // is a fresh function each render and would cause this to loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [insertRequest]);
+
+  async function runAction(action: SectionAction) {
+    setBusyAction(action.id);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/research/projects/${projectId}/sections/${sectionType}/ai`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ actionId: action.id }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // The route already translated any provider error into something a
+        // researcher can act on, and says whether anything was saved (§28).
+        throw new Error(body.error ?? "The AI action could not be completed.");
+      }
+      setPending({
+        text: body.content,
+        actionId: action.id,
+        provider: body.provider,
+        model: body.model,
+        warnings: body.warnings,
+        contextLayers: body.contextLayers,
+      });
+    } catch (err) {
+      setActionError((err as Error).message);
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  function applySuggestion(changeAction: ChangeAction, text: string) {
+    const next =
+      changeAction === "replace" ? text : content.trim() ? `${content}\n\n${text}` : text;
+
+    setContent(next);
+    setMetadata((prev) => ({ ...prev, aiAssisted: true, lastAiInsertAt: new Date().toISOString() }));
+    // Provenance travels with the save so the version row records which
+    // action and model produced the change, not just that content moved.
+    pendingChangeRef.current = {
+      action: changeAction,
+      provider: pending?.provider,
+      model: pending?.model,
+      sectionAction: pending?.actionId,
+    };
+    setPending(null);
+  }
 
   async function save(nextContent: string, nextStatus: SectionStatus, nextMetadata: Record<string, unknown>) {
     setSaveState("saving");
@@ -64,10 +136,16 @@ export default function SectionEditor({
       const res = await fetch(`/api/research/projects/${projectId}/sections/${sectionType}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: nextContent, status: nextStatus, metadata: nextMetadata }),
+        body: JSON.stringify({
+          content: nextContent,
+          status: nextStatus,
+          metadata: nextMetadata,
+          change: pendingChangeRef.current ?? { action: "manual" },
+        }),
       });
       if (!res.ok) throw new Error("save failed");
       const { section } = await res.json();
+      pendingChangeRef.current = null;
       setSaveState("saved");
       onSaved(section);
     } catch {
@@ -108,6 +186,30 @@ export default function SectionEditor({
           </span>
         </div>
       </div>
+
+      <SectionActions
+        sectionType={sectionType}
+        hasContent={content.trim().length > 0}
+        busyAction={busyAction}
+        onRun={runAction}
+      />
+
+      {actionError && (
+        <p role="alert" className="rounded border border-red-300 bg-red-50 p-2 text-xs text-red-800">
+          {actionError} Your section content was not changed.
+        </p>
+      )}
+
+      {pending && (
+        <AIChangeControl
+          proposed={pending.text}
+          currentContent={content}
+          warnings={pending.warnings}
+          contextLayers={pending.contextLayers}
+          onApply={applySuggestion}
+          onCancel={() => setPending(null)}
+        />
+      )}
 
       <textarea
         value={content}

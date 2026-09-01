@@ -611,6 +611,11 @@ export interface QuestionnaireQuestionRow {
   instrument_id: string;
   project_id: string;
   section_label: string;
+  /**
+   * The free-text mapping Phase 6 shipped, kept deliberately (Phase 18 §22).
+   * Some projects have only this, and dropping it to make a foreign key look
+   * tidy would delete the mapping they actually have.
+   */
   objective_label: string | null;
   variable_label: string | null;
   construct: string | null;
@@ -620,6 +625,19 @@ export interface QuestionnaireQuestionRow {
   required: boolean;
   order_index: number;
   created_at: string;
+
+  // --- Phase 18 structured mapping ------------------------------------
+  construct_id: string | null;
+  indicator_id: string | null;
+  scale_id: string | null;
+  /** Explicit, never inferred from wording — a guess would flip the sign of a result. */
+  reverse_coded: boolean;
+  item_provenance: MethodologyProvenance;
+  source_citation_id: string | null;
+  source_location: string | null;
+  /** Null unless the item genuinely came from a source; the DB requires the citation with it. */
+  adaptation_type: ItemAdaptationType | null;
+  updated_at: string;
 }
 
 export interface QuestionnaireQuestionInsert {
@@ -634,6 +652,15 @@ export interface QuestionnaireQuestionInsert {
   options?: string[] | null;
   required?: boolean;
   order_index: number;
+
+  construct_id?: string | null;
+  indicator_id?: string | null;
+  scale_id?: string | null;
+  reverse_coded?: boolean;
+  item_provenance?: MethodologyProvenance;
+  source_citation_id?: string | null;
+  source_location?: string | null;
+  adaptation_type?: ItemAdaptationType | null;
 }
 
 // ---------------------------------------------------------------------
@@ -690,4 +717,309 @@ export interface IdempotencyKeyRow {
   status_code: number;
   response_body: unknown;
   created_at: string;
+}
+
+// ---------------------------------------------------------------------
+// Methodology model (Phase 18)
+//
+// The structured half of the chain. The prose in `research_sections` stays
+// canonical for the document; these rows are canonical for reasoning, and
+// neither is derived from the other automatically (see
+// docs/PHASE_18_METHODOLOGY_AUDIT.md §3).
+// ---------------------------------------------------------------------
+
+/** The same five words the rest of the app already uses for where something came from. */
+export type MethodologyProvenance = "user" | "ai_suggested" | "source_stated" | "imported";
+
+export const PROVENANCE_LABELS: Record<MethodologyProvenance, string> = {
+  user: "Researcher",
+  ai_suggested: "AI suggested",
+  source_stated: "From source",
+  imported: "Imported",
+};
+
+/**
+ * Structural shape of a research question. `unclassified` is a real answer and
+ * the default: a question the rules cannot place is not a bad question, and a
+ * guessed shape would put a label the researcher never chose in front of every
+ * later check.
+ */
+export type QuestionKind =
+  | "descriptive" | "comparative" | "correlational" | "causal" | "exploratory" | "unclassified";
+
+export const QUESTION_KIND_LABELS: Record<QuestionKind, string> = {
+  descriptive: "Descriptive",
+  comparative: "Comparative",
+  correlational: "Correlational",
+  causal: "Causal / intervention",
+  exploratory: "Exploratory",
+  unclassified: "Unclassified",
+};
+
+export interface ResearchQuestionRow {
+  id: string;
+  project_id: string;
+  question_text: string;
+  question_kind: QuestionKind;
+  provenance: MethodologyProvenance;
+  confirmed: boolean;
+  order_index: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResearchQuestionInsert {
+  project_id: string;
+  question_text: string;
+  question_kind?: QuestionKind;
+  provenance?: MethodologyProvenance;
+  confirmed?: boolean;
+  order_index?: number;
+}
+
+export interface ResearchObjectiveRow {
+  id: string;
+  project_id: string;
+  /** Null while the objective has no question yet — work in progress, not an error. */
+  question_id: string | null;
+  objective_text: string;
+  provenance: MethodologyProvenance;
+  confirmed: boolean;
+  order_index: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResearchObjectiveInsert {
+  project_id: string;
+  question_id?: string | null;
+  objective_text: string;
+  provenance?: MethodologyProvenance;
+  confirmed?: boolean;
+  order_index?: number;
+}
+
+/**
+ * The role a construct plays in the study. One table holds both the concept and
+ * its role: a separate `variables` table would give the app two names for one
+ * thing, which is the confusion the consistency engine exists to detect.
+ */
+export type ConstructRole =
+  | "independent" | "dependent" | "mediator" | "moderator" | "control" | "demographic" | "latent";
+
+export const CONSTRUCT_ROLE_LABELS: Record<ConstructRole, string> = {
+  independent: "Independent variable",
+  dependent: "Dependent variable",
+  mediator: "Mediator",
+  moderator: "Moderator",
+  control: "Control variable",
+  demographic: "Demographic variable",
+  latent: "Construct (no role assigned)",
+};
+
+export interface ResearchConstructRow {
+  id: string;
+  project_id: string;
+  name: string;
+  role: ConstructRole;
+  /** What the concept means. */
+  conceptual_definition: string | null;
+  /** How it will be observed. Separate from the above because having the first
+   *  and not the second is the most common measurement gap there is. */
+  operational_definition: string | null;
+  notes: string | null;
+  provenance: MethodologyProvenance;
+  confirmed: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResearchConstructInsert {
+  project_id: string;
+  name: string;
+  role?: ConstructRole;
+  conceptual_definition?: string | null;
+  operational_definition?: string | null;
+  notes?: string | null;
+  provenance?: MethodologyProvenance;
+  confirmed?: boolean;
+}
+
+export interface ResearchIndicatorRow {
+  id: string;
+  project_id: string;
+  construct_id: string;
+  name: string;
+  /** A grouping label under the construct — a column, not a table. */
+  dimension: string | null;
+  description: string | null;
+  provenance: MethodologyProvenance;
+  confirmed: boolean;
+  order_index: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResearchIndicatorInsert {
+  project_id: string;
+  construct_id: string;
+  name: string;
+  dimension?: string | null;
+  description?: string | null;
+  provenance?: MethodologyProvenance;
+  confirmed?: boolean;
+  order_index?: number;
+}
+
+export type HypothesisForm =
+  | "association" | "prediction" | "difference" | "mediation" | "moderation" | "descriptive" | "unclassified";
+
+export const HYPOTHESIS_FORM_LABELS: Record<HypothesisForm, string> = {
+  association: "Association",
+  prediction: "Prediction",
+  difference: "Group difference",
+  mediation: "Mediation",
+  moderation: "Moderation",
+  descriptive: "Descriptive",
+  unclassified: "Unclassified",
+};
+
+/** `unspecified` is the default and is not a defect — "X is associated with Y"
+ *  states no direction, and recording one would put words in the study's mouth. */
+export type HypothesisDirection = "positive" | "negative" | "none" | "unspecified";
+
+export interface ResearchHypothesisRow {
+  id: string;
+  project_id: string;
+  objective_id: string | null;
+  question_id: string | null;
+  /** The researcher's own numbering — "H1", "H2a". */
+  label: string | null;
+  statement: string;
+  hypothesis_form: HypothesisForm;
+  direction: HypothesisDirection;
+  analysis_method: string | null;
+  provenance: MethodologyProvenance;
+  confirmed: boolean;
+  order_index: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResearchHypothesisInsert {
+  project_id: string;
+  objective_id?: string | null;
+  question_id?: string | null;
+  label?: string | null;
+  statement: string;
+  hypothesis_form?: HypothesisForm;
+  direction?: HypothesisDirection;
+  analysis_method?: string | null;
+  provenance?: MethodologyProvenance;
+  confirmed?: boolean;
+  order_index?: number;
+}
+
+/** Where a construct sits in one hypothesis. A property of the relationship:
+ *  the same construct is the outcome in H1 and the predictor in H2. */
+export type HypothesisPosition = "predictor" | "outcome" | "mediator" | "moderator" | "control";
+
+export const HYPOTHESIS_POSITION_LABELS: Record<HypothesisPosition, string> = {
+  predictor: "Predictor",
+  outcome: "Outcome",
+  mediator: "Mediator",
+  moderator: "Moderator",
+  control: "Control",
+};
+
+export interface ResearchHypothesisVariableRow {
+  id: string;
+  project_id: string;
+  hypothesis_id: string;
+  construct_id: string;
+  position: HypothesisPosition;
+  provenance: MethodologyProvenance;
+  created_at: string;
+}
+
+export interface ResearchHypothesisVariableInsert {
+  project_id: string;
+  hypothesis_id: string;
+  construct_id: string;
+  position: HypothesisPosition;
+  provenance?: MethodologyProvenance;
+}
+
+export interface ScalePoint {
+  value: number;
+  label: string;
+}
+
+/** Which end of the scale is the high end, so reverse-coding can be checked
+ *  rather than assumed. */
+export type ScalePolarity = "ascending" | "descending" | "unordered";
+
+export interface ResearchScaleRow {
+  id: string;
+  project_id: string;
+  name: string;
+  points: ScalePoint[];
+  polarity: ScalePolarity;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResearchScaleInsert {
+  project_id: string;
+  name: string;
+  points?: ScalePoint[];
+  polarity?: ScalePolarity;
+}
+
+/** How an item relates to the source it came from. Null unless it came from one. */
+export type ItemAdaptationType = "verbatim" | "adapted" | "translated" | "inspired_by";
+
+export const ADAPTATION_TYPE_LABELS: Record<ItemAdaptationType, string> = {
+  verbatim: "Used verbatim",
+  adapted: "Adapted",
+  translated: "Translated",
+  inspired_by: "Inspired by",
+};
+
+export type MethodologyEntityType =
+  | "research_question" | "objective" | "construct" | "indicator" | "hypothesis"
+  | "hypothesis_variable" | "scale" | "questionnaire_item" | "framework" | "review";
+
+export type MethodologyEventAction =
+  | "created" | "updated" | "deleted" | "mapped" | "unmapped" | "restored"
+  | "ai_suggestion_accepted" | "ai_suggestion_rejected" | "review_run";
+
+/**
+ * One entry in the append-only methodology audit. Carries the proposal, the
+ * researcher's action and the value actually written, so "what was I offered
+ * and what did I decide" is reconstructable (§23).
+ */
+export interface MethodologyEventRow {
+  id: string;
+  project_id: string;
+  entity_type: MethodologyEntityType;
+  /** Not a foreign key: history must survive the deletion of what it describes. */
+  entity_id: string | null;
+  action: MethodologyEventAction;
+  summary: string;
+  proposal: Record<string, unknown> | null;
+  previous_value: Record<string, unknown> | null;
+  new_value: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface MethodologyEventInsert {
+  project_id: string;
+  entity_type: MethodologyEntityType;
+  entity_id?: string | null;
+  action: MethodologyEventAction;
+  summary: string;
+  proposal?: Record<string, unknown> | null;
+  previous_value?: Record<string, unknown> | null;
+  new_value?: Record<string, unknown> | null;
 }

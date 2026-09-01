@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import AICopilot from "@/components/AICopilot";
+import DataAnalysisPanel from "@/components/DataAnalysisPanel";
 import DocumentsPanel from "@/components/DocumentsPanel";
 import QualityCheckPanel from "@/components/QualityCheckPanel";
 import QuestionnaireBuilder from "@/components/QuestionnaireBuilder";
@@ -44,6 +45,7 @@ export default function ProjectWorkspace({
   const [showDocuments, setShowDocuments] = useState(false);
   const [showQualityCheck, setShowQualityCheck] = useState(false);
   const [insertRequest, setInsertRequest] = useState<string | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const statuses = useMemo(() => {
     const result = {} as Record<SectionType, SectionStatus>;
@@ -69,6 +71,29 @@ export default function ProjectWorkspace({
         </div>
         <div className="flex items-center gap-4">
           <span className="text-xs text-neutral-500">{percentComplete}% complete</span>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowExportMenu((v) => !v)}
+              className="rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50"
+            >
+              Export
+            </button>
+            {showExportMenu && (
+              <div className="absolute right-0 z-10 mt-1 w-40 rounded border border-neutral-200 bg-white py-1 shadow-lg">
+                {(["docx", "pdf", "md"] as const).map((format) => (
+                  <a
+                    key={format}
+                    href={`/api/research/projects/${project.id}/export?format=${format}`}
+                    onClick={() => setShowExportMenu(false)}
+                    className="block px-3 py-1.5 text-sm hover:bg-neutral-50"
+                  >
+                    {format === "docx" ? "Word (.docx)" : format === "pdf" ? "PDF" : "Markdown (.md)"}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => setShowQualityCheck(true)}
@@ -98,6 +123,8 @@ export default function ProjectWorkspace({
         <div className="min-h-0">
           {activeSectionType === "questionnaire" ? (
             <QuestionnaireBuilder projectId={project.id} />
+          ) : activeSectionType === "data_analysis" ? (
+            <DataAnalysisPanel projectId={project.id} />
           ) : (
             <SectionEditor
               key={activeSectionType}

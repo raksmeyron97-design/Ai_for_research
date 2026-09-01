@@ -1,5 +1,7 @@
 import type { AIRequest, TaskType } from "../types";
+import { buildConclusionSystemInstruction } from "./conclusion";
 import { buildDefaultSystemInstruction } from "./default";
+import { buildDiscussionSystemInstruction } from "./discussion";
 import { buildLiteratureSystemInstruction } from "./literature";
 import { buildMethodologySystemInstruction } from "./methodology";
 import { buildObjectivesSystemInstruction } from "./objectives";
@@ -11,7 +13,7 @@ type PromptBuilder = (request: AIRequest) => string;
  * One specialized prompt per research section (Section 22) — not a single
  * generic template. Add a new file under prompts/ and register it here as
  * the section generators for Phase 2+ come online (variables, questionnaire,
- * results, discussion, conclusion, references, ...).
+ * results, references, ...).
  */
 const PROMPT_REGISTRY: Partial<Record<TaskType, PromptBuilder>> = {
   objective_generation: buildObjectivesSystemInstruction,
@@ -23,6 +25,8 @@ const PROMPT_REGISTRY: Partial<Record<TaskType, PromptBuilder>> = {
   quality_check: buildQualityCheckSystemInstruction,
   literature_review: buildLiteratureSystemInstruction,
   source_search: buildLiteratureSystemInstruction,
+  discussion: buildDiscussionSystemInstruction,
+  conclusion: buildConclusionSystemInstruction,
 };
 
 export function buildTaskSystemInstruction(request: AIRequest): string {

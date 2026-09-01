@@ -310,6 +310,126 @@ Full detail lives in
   environment, so generation itself was only exercised through mocks
   plus one real (intentionally failing) request.
 
+## 2g. What exists now (Phase 7)
+
+Full detail lives in
+[`AI_DATA_ANALYSIS.md`](./AI_DATA_ANALYSIS.md). Summary:
+
+- **New schema**: `research_datasets` — CSV/XLSX parsed into a column
+  schema (type-inferred: numeric/categorical/text/date) plus row data,
+  stored as jsonb (academic-scale datasets, not big data — see the
+  migration's comment for why that's the right call here).
+- **The core design decision**: `summarizeDataset()` computes every
+  descriptive statistic in plain TypeScript — the model is never asked
+  to produce or restate a number, only to write a narrative
+  interpretation of numbers the app already computed and will render
+  independently of anything the model says. Verified with a test where
+  the mocked model "hallucinates" a number in its prose and the real
+  computed summary is unaffected.
+- **Statistical Guard** (`recommendTest`, spec §28): recommends which
+  test fits two variables' types — never computes a p-value or runs
+  anything. A test explicitly asserts it never returns a computed
+  statistic, to keep that boundary from drifting.
+- **Ties into the Phase 5 dataset guard for the first time from the
+  "allowed" side**: `results_generation` with a real `dataSetId` now
+  passes the guard rather than being blocked — verified for real (a
+  `503` from genuinely missing AI credentials, not the guard's "Missing:
+  Dataset" message, confirming the guard let the request through).
+- **Fully verified against the real local Supabase instance**: the 10th
+  migration applied cleanly; a real CSV was uploaded through the actual
+  running app and parsed/type-inferred correctly; the computed summary
+  matched hand-calculated values exactly; the full UI (upload → view
+  summary → trigger interpretation → delete) was exercised end to end in
+  a real browser session — which is also how a real bug was found (a
+  stale error message surviving navigation back to the dataset list) and
+  fixed.
+- **49 new unit tests** (214 total) — the most heavily tested phase, since
+  a subtly wrong statistics formula here could put a wrong number in a
+  real thesis. `sampleStandardDeviation` checked against a published
+  textbook value, not just internal consistency.
+- **Not built**: actually running inferential tests (t-test/chi-square/
+  ANOVA/regression — only descriptive stats and Pearson correlation are
+  real computed numbers), the Discussion/Conclusion engines (spec §30-31,
+  natural next phase-adjacent work), charts, and a persisted/versioned
+  analysis-result record (the summary is recomputed live from the stored
+  dataset rather than snapshotted).
+
+## 2h. What exists now (Phase 8)
+
+Full detail lives in
+[`AI_DISCUSSION_CONCLUSION.md`](./AI_DISCUSSION_CONCLUSION.md). Summary:
+
+- **No new schema** — this phase is entirely AI-generation logic on
+  tables that already existed.
+- **`generateDiscussion()`/`generateConclusion()`**, each with a hard
+  guard (no model called at all) requiring real Results/Objectives
+  content first — the same shape as Phase 5's dataset guard, one section
+  later in the chain. Verified for real: both the block path (`422`,
+  exact message) and — the direction that actually proves the guard
+  isn't over-broad — the allow path (writing real content through the
+  real running app and watching the request correctly reach a real
+  provider call).
+- **Discussion**: reuses Phase 5's `verifyCitationsInText()` directly to
+  catch invented/unverified `[citation_key]` references in the generated
+  text — no new citation-checking code, the same function the quality
+  checker already uses.
+- **Conclusion**: `detectUnsourcedNumbers()` — a real, tested, and
+  explicitly bounded heuristic that flags a number in the conclusion
+  absent from the objectives/results/discussion it was generated from.
+  The doc is direct about what it does and doesn't catch (formatting
+  variants of the same number can false-positive; non-numeric
+  fabrications aren't caught at all) — a warning to review, not a claim
+  of complete fabrication detection.
+- **A third UI integration pattern**: unlike Phases 6/7's dedicated
+  panels, Discussion/Conclusion stay ordinary prose sections — a
+  "Generate ... draft" button was added to the existing `AICopilot`
+  chat, reusing the Phase 4 message-list + "Insert into section" flow
+  that already exists for every other AI response, rather than building
+  new UI.
+- **23 new unit tests** (237 total). **Not verified**: actual generated
+  content quality — no real AI provider keys in this environment.
+
+## 2i. What exists now (Phase 9)
+
+Full detail lives in [`AI_DOCUMENT_EXPORT.md`](./AI_DOCUMENT_EXPORT.md).
+Summary:
+
+- **No new schema, no AI calls** — export reads existing tables
+  (`research_sections`, `research_citations`, `research_instruments`,
+  `questionnaire_questions`) and formats them; it cannot fabricate
+  content.
+- **One intermediate representation, three renderers**:
+  `compileDocumentModel()` builds a flat `heading`/`paragraph`/`table`/
+  `pagebreak` block list once; `to-markdown.ts`/`to-docx.ts`/`to-pdf.ts`
+  each only need to understand that block set. New deps: `docx` and
+  `pdfkit` (+ `@types/pdfkit`) — `pdfkit` added to `next.config.ts`'s
+  `serverExternalPackages` for the same disk-based-asset-loading reason
+  `pdf-parse` was in Phase 3.
+- The 18-section chain is grouped into six numbered chapters
+  (spec §21's grouping) plus a References chapter built from the real
+  `research_citations` rows — never from the free-text References
+  section's prose — and an Appendices chapter that includes the full
+  questionnaire instrument as a table, not just an overview.
+- **Two real bugs found only by generating real output files**, not by
+  typecheck/lint/test/build: (1) the export was using
+  `research_projects.title` (the creation-time label) instead of the
+  Title *section's* drafted content for the document title/filename —
+  found by exporting a project where the two had diverged; (2) the PDF
+  table renderer divided columns equally with a fixed row height and
+  `ellipsis: true`, silently truncating long question text and answer
+  options in the appendix instrument table — found by extracting text
+  back out of a real generated PDF with `pdf-parse` and seeing it cut
+  off mid-sentence. Both fixed; both have regression tests.
+- **18 new unit tests** (255 total), plus real verification against the
+  local Supabase instance: a real authenticated session exporting a real
+  project's mixed drafted/empty sections, a seeded real citation, and a
+  seeded real two-question instrument, in all three formats, with the
+  resulting files' text re-extracted (`pdf-parse`, `unzip`+
+  `document.xml`) and checked against the source data.
+- **Not verified**: PDF visual layout/pagination beyond text-extraction
+  fidelity — no PDF rasterizer was available to screenshot rendered
+  pages.
+
 ## 3. Explicitly out of scope for this pass (N/A / deferred)
 
 These spec sections describe later phases and were **not** built now —
@@ -328,7 +448,12 @@ listed here so it's clear what "Phase 1 done" does and doesn't include:
   `needsWeb` in the classifier, but no provider-side grounding tool is
   wired up.
 - Alignment engine, questionnaire builder, data analysis, discussion/
-  conclusion engines, export, admin analytics dashboard (§20, §25–34).
+  conclusion engines, admin analytics dashboard (§20, §25–34). Export
+  (§52) is now built — see §2i.
+- Front-matter document structure (§21's Cover/Declaration/
+  Acknowledgement/Abstract/List of Tables/List of Figures) — not
+  exportable because none of it exists as data in this schema; would
+  require new section types and editor UI, out of scope for Phase 9.
 - Structured verification output (`ResearchValidationIssue[]`) — the
   dual-model reviewer pass in `orchestrator.ts` currently returns free
   text in `structuredData.verification.notes`, not a parsed, typed issue
@@ -434,22 +559,45 @@ Following the spec's phase order:
    DB CHECK), dedicated workspace UI (§2f). Remaining loose ends:
    editing/reordering questions in the UI, regenerating into an existing
    instrument, questionnaire export (Phase 9).
-6. Phases 7–10 as scoped in the spec, each as its own reviewable slice.
-   Phase 7 (Data Analysis) is the next one that assumes real
-   infrastructure this build hasn't needed yet (a dataset
-   upload/parsing pipeline) — expect it to be a bigger schema/pipeline
-   lift than Phase 6 was, closer in scope to Phase 3.
+6. ~~Phase 7 — Data Analysis~~ **done**: dataset upload/parsing (CSV/
+   XLSX), real computed descriptive statistics (never AI-generated),
+   the statistical guard (recommends tests, never auto-runs them),
+   results generation grounded in real numbers, dedicated workspace UI
+   (§2g). Remaining loose ends: actually running inferential tests
+   (t-test/chi-square/ANOVA — only descriptive stats + correlation are
+   real computed numbers so far), charts.
+7. ~~Phase 8 — Discussion & Conclusion~~ **done**: both generators with
+   hard guards requiring real Results/Objectives content, discussion
+   citation-verification reusing Phase 5's integrity guard directly,
+   conclusion's `detectUnsourcedNumbers` heuristic, a third UI pattern
+   (a generate button inside the existing chat, not a new panel) (§2h).
+   Remaining loose ends: per-finding structured output (deliberately
+   free text here, since this content is meant to read as prose in the
+   final thesis), auto-inserting drafts (deliberately manual — the
+   researcher approves every insert).
+8. ~~Phase 9 — Document Export~~ **done**: DOCX/PDF/Markdown export of
+   the full 18-section chain, grouped into thesis chapters, with a real
+   reference list built from `research_citations` and a full
+   questionnaire-instrument appendix table (§2i). Remaining loose ends:
+   front-matter pages (no data for them yet — see §3), page numbers/TOC
+   in the generated files, exporting a single section instead of the
+   whole project.
+9. Phase 10 (admin analytics) as scoped in the spec, as its own
+   reviewable slice.
 
-Do not skip straight to a later phase — most of them (data analysis,
-discussion engine) assume the project/document data model from Phases
-2–3 exists.
+Phase 10 (admin analytics) is the only remaining phase from the spec's
+original sequence. Unlike Phases 2-9, it's operator/admin-facing rather
+than part of the researcher's own workflow, so it doesn't block or get
+blocked by anything a researcher does in their own project.
 
 **A capability that changed mid-project, worth remembering for later
 phases**: a real Docker daemon and the Supabase CLI became available
-partway through Phase 5, and were used to catch three real bugs since
-(a missing `GRANT` blocking all RLS-protected queries; a context-
-building/guard ordering bug; confirmed the Phase 6 CHECK constraint
-actually fires) that mocked tests and manual review had all missed. If
+partway through Phase 5, and were used to catch four real bugs since (a
+missing `GRANT` blocking all RLS-protected queries; a context-building/
+guard ordering bug; confirmed the Phase 6 CHECK constraint actually
+fires; confirmed the Phase 5 dataset guard's "allow" path, not just its
+"block" path, actually works — and Phase 8 confirmed the same "allow
+path" pattern for its own two guards). If
 Docker is still available for later phases, keep verifying against
 `supabase start` rather than relying on mocks alone for anything
 touching RLS, migrations, or request ordering — see

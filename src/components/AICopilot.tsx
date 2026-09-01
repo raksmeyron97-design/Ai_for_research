@@ -4,10 +4,23 @@ import { useRef, useState } from "react";
 import { SECTION_LABELS } from "@/lib/db/types";
 import type { SectionType } from "@/lib/db/types";
 
+interface Warning {
+  severity: string;
+  category: string;
+  message: string;
+  recommendation?: string;
+}
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  warnings?: Warning[];
 }
+
+const SPECIAL_GENERATORS: Partial<Record<SectionType, { label: string; endpoint: string }>> = {
+  discussion: { label: "Generate Discussion draft", endpoint: "discussion" },
+  conclusion: { label: "Generate Conclusion draft", endpoint: "conclusion" },
+};
 
 export default function AICopilot({
   projectId,
@@ -21,8 +34,29 @@ export default function AICopilot({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [generatingSpecial, setGeneratingSpecial] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
+
+  const specialGenerator = SPECIAL_GENERATORS[sectionType];
+
+  async function handleGenerateSpecial() {
+    if (!specialGenerator || generatingSpecial) return;
+    setError(null);
+    setGeneratingSpecial(true);
+    try {
+      const res = await fetch(`/api/research/projects/${projectId}/${specialGenerator.endpoint}/generate`, {
+        method: "POST",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? "Generation failed");
+      setMessages((prev) => [...prev, { role: "assistant", content: body.content, warnings: body.warnings }]);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setGeneratingSpecial(false);
+    }
+  }
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
@@ -81,6 +115,16 @@ export default function AICopilot({
       <div className="border-b border-neutral-200 p-3">
         <h2 className="text-sm font-medium">AI Copilot</h2>
         <p className="text-xs text-neutral-500">Grounded in {SECTION_LABELS[sectionType]} and your project profile.</p>
+        {specialGenerator && (
+          <button
+            type="button"
+            onClick={handleGenerateSpecial}
+            disabled={generatingSpecial}
+            className="mt-2 w-full rounded bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+          >
+            {generatingSpecial ? "Generating…" : specialGenerator.label}
+          </button>
+        )}
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto p-3">
@@ -107,6 +151,16 @@ export default function AICopilot({
                 >
                   Insert into {SECTION_LABELS[sectionType]}
                 </button>
+              </div>
+            )}
+            {m.warnings && m.warnings.length > 0 && (
+              <div className="mt-2 space-y-1 text-left">
+                {m.warnings.map((w, wi) => (
+                  <div key={wi} className="rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                    <span className="font-medium uppercase">{w.severity}</span>: {w.message}
+                    {w.recommendation && <span className="block text-amber-700">→ {w.recommendation}</span>}
+                  </div>
+                ))}
               </div>
             )}
           </div>

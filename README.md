@@ -44,13 +44,23 @@ extraction, chunking, embeddings, pgvector retrieval — see
 (alignment engine, quality checker, structured AI output, a
 code-enforced integrity guard — see
 [`docs/AI_RESEARCH_INTELLIGENCE.md`](./docs/AI_RESEARCH_INTELLIGENCE.md)),
-and Phase 6 (AI-generated questionnaires with enforced validated-
+Phase 6 (AI-generated questionnaires with enforced validated-
 instrument safety — see
-[`docs/AI_QUESTIONNAIRE_BUILDER.md`](./docs/AI_QUESTIONNAIRE_BUILDER.md))
+[`docs/AI_QUESTIONNAIRE_BUILDER.md`](./docs/AI_QUESTIONNAIRE_BUILDER.md)),
+Phase 7 (dataset upload/parsing, real computed statistics the model
+never touches, a statistical-test guard — see
+[`docs/AI_DATA_ANALYSIS.md`](./docs/AI_DATA_ANALYSIS.md)), Phase 8
+(Discussion/Conclusion generators with hard guards against discussing or
+concluding from findings that don't exist yet — see
+[`docs/AI_DISCUSSION_CONCLUSION.md`](./docs/AI_DISCUSSION_CONCLUSION.md)),
+and Phase 9 (DOCX/PDF/Markdown export of the full research chain, with a
+reference list built from real saved citations and a full questionnaire-
+instrument appendix — see
+[`docs/AI_DOCUMENT_EXPORT.md`](./docs/AI_DOCUMENT_EXPORT.md))
 are implemented. The auth/dashboard/editor golden path, RLS across every
-table, and the questionnaire's safety constraint have all been verified
-against a real local Supabase instance (Docker); the AI provider calls
-themselves have not, since no real Gemini/OpenAI keys are available in
-this build environment. Later phases (data analysis, export, admin
-analytics) are not yet built — see the audit doc for the recommended
-sequence.
+table, every phase's data-integrity constraints, and every export format
+have all been verified against a real local Supabase instance (Docker)
+and a real running server; the AI provider calls themselves have not,
+since no real Gemini/OpenAI keys are available in this build
+environment. The only remaining phase (admin analytics) is not yet
+built — see the audit doc for details.

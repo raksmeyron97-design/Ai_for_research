@@ -359,3 +359,36 @@ export interface QuestionnaireQuestionInsert {
   required?: boolean;
   order_index: number;
 }
+
+// ---------------------------------------------------------------------
+// research_datasets (Phase 7 — Data Analysis)
+// ---------------------------------------------------------------------
+export type ColumnType = "numeric" | "categorical" | "text" | "date";
+
+export interface ColumnSchema {
+  name: string;
+  type: ColumnType;
+  missingCount: number;
+}
+
+export type DatasetRow = Record<string, string | number | null>;
+
+export interface ResearchDatasetRow {
+  id: string;
+  project_id: string;
+  uploaded_by: string;
+  file_name: string;
+  row_count: number;
+  column_schema: ColumnSchema[];
+  data: DatasetRow[];
+  created_at: string;
+}
+
+export interface ResearchDatasetInsert {
+  project_id: string;
+  uploaded_by: string;
+  file_name: string;
+  row_count: number;
+  column_schema: ColumnSchema[];
+  data: DatasetRow[];
+}

@@ -33,3 +33,4 @@ export { insertMessage, getRecentMessages } from "./messages";
 export { getConversation, createConversation } from "./conversations";
 export { listInstruments, getInstrument, createInstrument, deleteInstrument } from "./instruments";
 export { listQuestions, insertQuestions, updateQuestion, deleteQuestion } from "./questions";
+export { listDatasets, getDataset, createDataset, deleteDataset } from "./datasets";

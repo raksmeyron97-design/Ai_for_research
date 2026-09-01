@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
     "pdfjs-dist",
     "mammoth",
     "exceljs",
+    // pdfkit loads its .afm font metrics files from disk at runtime —
+    // webpack bundling breaks that path resolution the same way it broke
+    // pdf-parse above.
+    "pdfkit",
   ],
 };
 

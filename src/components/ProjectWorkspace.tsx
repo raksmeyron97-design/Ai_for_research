@@ -8,6 +8,7 @@ import DocumentsPanel from "@/components/DocumentsPanel";
 import QualityCheckPanel from "@/components/QualityCheckPanel";
 import QuestionnaireBuilder from "@/components/QuestionnaireBuilder";
 import ResearchNavigator from "@/components/ResearchNavigator";
+import WorkspacePanes from "@/components/WorkspacePanes";
 import SectionEditor from "@/components/SectionEditor";
 import { SECTION_CHAIN } from "@/lib/db/types";
 import type {
@@ -111,17 +112,16 @@ export default function ProjectWorkspace({
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[220px_1fr_360px]">
-        <div className="min-h-0 border-r border-neutral-200">
+      <WorkspacePanes
+        navigator={
           <ResearchNavigator
             statuses={statuses}
             activeSectionType={activeSectionType}
             onSelect={setActiveSectionType}
           />
-        </div>
-
-        <div className="min-h-0">
-          {activeSectionType === "questionnaire" ? (
+        }
+        editor={
+          activeSectionType === "questionnaire" ? (
             <QuestionnaireBuilder projectId={project.id} />
           ) : activeSectionType === "data_analysis" ? (
             <DataAnalysisPanel projectId={project.id} />
@@ -137,17 +137,16 @@ export default function ProjectWorkspace({
               insertRequest={insertRequest}
               onInsertConsumed={() => setInsertRequest(null)}
             />
-          )}
-        </div>
-
-        <div className="min-h-0 border-l border-neutral-200">
+          )
+        }
+        assistant={
           <AICopilot
             projectId={project.id}
             sectionType={activeSectionType}
             onInsert={(text) => setInsertRequest(text)}
           />
-        </div>
-      </div>
+        }
+      />
 
       {showDocuments && (
         <DocumentsPanel

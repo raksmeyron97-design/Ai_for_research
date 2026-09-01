@@ -60,6 +60,136 @@ export const SECTION_LABELS: Record<SectionType, string> = {
 
 export type SectionStatus = "not_started" | "in_progress" | "completed";
 
+// ---------------------------------------------------------------------
+// Evidence model (Phase 17)
+// ---------------------------------------------------------------------
+
+/**
+ * Not every assertion needs a citation. `interpretive`, `user_provided` and
+ * `inference` claims legitimately have none, and counting them against
+ * evidence coverage would punish honest writing.
+ */
+export type ClaimType =
+  | "factual"
+  | "statistical"
+  | "clinical"
+  | "comparative"
+  | "interpretive"
+  | "user_provided"
+  | "inference";
+
+/** Never silently upgraded — see `deriveClaimStatus` for the only path to SUPPORTED. */
+export type EvidenceStatusLabel =
+  | "SUPPORTED"
+  | "PARTIALLY_SUPPORTED"
+  | "UNSUPPORTED"
+  | "USER_PROVIDED"
+  | "INFERENCE"
+  | "NEEDS_VERIFICATION";
+
+/** The judgement on one claim-evidence pair. Lives on the relation because the same excerpt can support one claim and not another. */
+export type SupportLabel = "SUPPORTED" | "PARTIAL" | "UNSUPPORTED" | "NEEDS_REVIEW";
+
+export interface ResearchClaimRow {
+  id: string;
+  project_id: string;
+  section_type: SectionType;
+  claim_text: string;
+  claim_type: ClaimType;
+  needs_evidence: boolean;
+  evidence_status: EvidenceStatusLabel;
+  source_offset_start: number | null;
+  source_offset_end: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResearchClaimInsert {
+  project_id: string;
+  section_type: SectionType;
+  claim_text: string;
+  claim_type?: ClaimType;
+  needs_evidence?: boolean;
+  evidence_status?: EvidenceStatusLabel;
+  source_offset_start?: number | null;
+  source_offset_end?: number | null;
+}
+
+export interface ResearchEvidenceRow {
+  id: string;
+  project_id: string;
+  citation_id: string;
+  document_id: string | null;
+  chunk_id: string | null;
+  excerpt: string;
+  page: number | null;
+  section_label: string | null;
+  relevance_note: string | null;
+  created_at: string;
+}
+
+export interface ResearchEvidenceInsert {
+  project_id: string;
+  citation_id: string;
+  document_id?: string | null;
+  chunk_id?: string | null;
+  excerpt: string;
+  page?: number | null;
+  section_label?: string | null;
+  relevance_note?: string | null;
+}
+
+export interface ResearchClaimEvidenceRow {
+  id: string;
+  project_id: string;
+  claim_id: string;
+  evidence_id: string;
+  support: SupportLabel;
+  note: string | null;
+  inserted_into_section: SectionType | null;
+  inserted_at: string | null;
+  created_at: string;
+}
+
+export interface ResearchClaimEvidenceInsert {
+  project_id: string;
+  claim_id: string;
+  evidence_id: string;
+  support?: SupportLabel;
+  note?: string | null;
+  inserted_into_section?: SectionType | null;
+  inserted_at?: string | null;
+}
+
+/** A framework node. `ai_suggested` survives editing around it, so provenance is not lost. */
+export interface FrameworkNode {
+  id: string;
+  label: string;
+  role: "population" | "exposure" | "mediator" | "outcome" | "covariate";
+  ai_suggested: boolean;
+}
+
+export interface FrameworkEdge {
+  id: string;
+  from: string;
+  to: string;
+  rationale: string;
+  ai_suggested: boolean;
+}
+
+export interface FrameworkGraph {
+  nodes: FrameworkNode[];
+  edges: FrameworkEdge[];
+}
+
+export interface ResearchFrameworkRow {
+  id: string;
+  project_id: string;
+  graph: FrameworkGraph;
+  created_at: string;
+  updated_at: string;
+}
+
 export type DocumentType =
   | "thesis" | "article" | "guideline" | "questionnaire"
   | "dataset" | "reference" | "template" | "other";

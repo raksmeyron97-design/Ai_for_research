@@ -17,7 +17,8 @@
     "ai:benchmark:gemini": "AI_BENCH_PROVIDERS=gemini AI_BENCH_SUITE=full npm run ai:benchmark",
     "ai:benchmark:openai": "AI_BENCH_PROVIDERS=openai AI_BENCH_SUITE=full npm run ai:benchmark",
     "ai:benchmark:compare": "AI_BENCH_PROVIDERS=gemini,openai AI_BENCH_SUITE=full AI_BENCH_JUDGE=true npm run ai:benchmark",
-    "ai:benchmark:dry": "AI_BENCH_DRY_RUN=true AI_BENCH_SUITE=full npm run ai:benchmark"
+    "ai:benchmark:dry": "AI_BENCH_DRY_RUN=true AI_BENCH_SUITE=full npm run ai:benchmark",
+    "db:verify:isolation": "docker exec -i supabase_db_AI_for_research psql -U postgres -d postgres < supabase/tests/phase17_project_isolation.sql"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",
@@ -37,6 +38,9 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.6",
     "@types/node": "^22.10.2",
     "@types/pdfkit": "^0.17.6",
     "@types/react": "^19.0.2",
@@ -44,6 +48,7 @@
     "autoprefixer": "^10.4.20",
     "eslint": "^9.17.0",
     "eslint-config-next": "15.5.24",
+    "jsdom": "^30.0.1",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",

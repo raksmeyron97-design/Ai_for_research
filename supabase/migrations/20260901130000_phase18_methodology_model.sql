@@ -429,4 +429,17 @@ grant select, insert, update, delete on
   research_scales
   to authenticated;
 
+-- methodology_events is append-only, and saying so is not enough.
+--
+-- The Phase 3 migration set `alter default privileges ... grant select, insert,
+-- update, delete on tables to authenticated`, so every table created since gets
+-- UPDATE and DELETE automatically. Granting only select and insert here would
+-- have left both in place and the append-only property would have been a
+-- comment rather than a rule -- which is exactly what the isolation test caught.
+--
+-- The revoke makes an attempt fail loudly. Without it the write is still
+-- blocked (there is no update or delete policy, and RLS denies by default), but
+-- silently, as a statement that affects no rows -- and a barrier that looks
+-- like a successful no-op is a barrier nobody notices has moved.
 grant select, insert on methodology_events to authenticated;
+revoke update, delete, truncate on methodology_events from authenticated;

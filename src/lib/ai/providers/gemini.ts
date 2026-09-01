@@ -1,6 +1,6 @@
-import { GoogleGenAI } from "@google/genai";
 import { AIProviderError } from "../errors";
-import { requireApiKey } from "../model-config";
+import { getGeminiClient } from "../gemini-client";
+import { toGeminiSchema } from "../json-schema";
 import type {
   AIChunk,
   AIProvider,
@@ -9,15 +9,6 @@ import type {
   TokenCountRequest,
   TokenUsage,
 } from "../types";
-
-let client: GoogleGenAI | null = null;
-
-function getClient(): GoogleGenAI {
-  if (!client) {
-    client = new GoogleGenAI({ apiKey: requireApiKey("gemini") });
-  }
-  return client;
-}
 
 function toUsage(usageMetadata: unknown): TokenUsage | undefined {
   if (!usageMetadata || typeof usageMetadata !== "object") return undefined;
@@ -34,13 +25,17 @@ export const GeminiProvider: AIProvider = {
 
   async generate(request: ProviderGenerateRequest): Promise<AIResponse> {
     try {
-      const response = await getClient().models.generateContent({
+      const response = await getGeminiClient().models.generateContent({
         model: request.model,
         contents: request.prompt,
         config: {
           systemInstruction: request.systemInstruction,
           maxOutputTokens: request.maxOutputTokens,
           temperature: request.temperature,
+          ...(request.responseSchema && {
+            responseMimeType: "application/json",
+            responseSchema: toGeminiSchema(request.responseSchema),
+          }),
         },
       });
 
@@ -57,7 +52,7 @@ export const GeminiProvider: AIProvider = {
 
   async *stream(request: ProviderGenerateRequest): AsyncIterable<AIChunk> {
     try {
-      const stream = await getClient().models.generateContentStream({
+      const stream = await getGeminiClient().models.generateContentStream({
         model: request.model,
         contents: request.prompt,
         config: {
@@ -78,7 +73,7 @@ export const GeminiProvider: AIProvider = {
 
   async countTokens(request: TokenCountRequest): Promise<TokenUsage> {
     try {
-      const result = await getClient().models.countTokens({
+      const result = await getGeminiClient().models.countTokens({
         model: request.model,
         contents: request.text,
       });

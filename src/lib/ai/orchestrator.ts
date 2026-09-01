@@ -1,4 +1,5 @@
 import { AllProvidersFailedError, AIProviderError, withRetry } from "./errors";
+import { buildNoDatasetResponse, requiresDataset } from "./integrity-guard";
 import { getMaxOutputTokens } from "./model-config";
 import { buildPrompt, buildSystemInstruction } from "./prompt-manager";
 import { getReviewerProvider, resolveFallback, resolveProvider, type RoutingDecision } from "./router";
@@ -14,6 +15,7 @@ async function callProvider(
   decision: RoutingDecision,
   systemInstruction: string,
   prompt: string,
+  responseSchema?: Record<string, unknown>,
 ): Promise<AIResponse> {
   const maxOutputTokens = getMaxOutputTokens();
   return withRetry(
@@ -23,6 +25,7 @@ async function callProvider(
         systemInstruction,
         prompt,
         maxOutputTokens,
+        responseSchema,
       }),
     { retries: 1, timeoutMs: 45_000 },
   );
@@ -40,6 +43,15 @@ export class AIOrchestrator {
   async generate(request: AIRequest): Promise<AIResponse> {
     const classification = classifyTask(request);
     const primary = resolveProvider(classification);
+
+    // Hard block, not a prompt request: a results/analysis task with no
+    // dataset attached never reaches a model (Section 19). No usage is
+    // recorded — no provider was called, so there's no cost or latency
+    // to log.
+    if (requiresDataset(request.taskType) && !request.dataSetId) {
+      return buildNoDatasetResponse(primary.providerName, primary.model);
+    }
+
     const systemInstruction = buildSystemInstruction(request);
     const prompt = buildPrompt(request);
 
@@ -49,7 +61,7 @@ export class AIOrchestrator {
     let usedDecision = primary;
 
     try {
-      response = await callProvider(primary, systemInstruction, prompt);
+      response = await callProvider(primary, systemInstruction, prompt, request.responseSchema);
     } catch (err) {
       const providerError =
         err instanceof AIProviderError
@@ -76,7 +88,7 @@ export class AIOrchestrator {
       }
 
       try {
-        response = await callProvider(fallback, systemInstruction, prompt);
+        response = await callProvider(fallback, systemInstruction, prompt, request.responseSchema);
         usedDecision = fallback;
       } catch (fallbackErr) {
         const fallbackError =
@@ -161,6 +173,12 @@ export class AIOrchestrator {
   async *stream(request: AIRequest): AsyncIterable<AIChunk> {
     const classification = classifyTask(request);
     const decision = resolveProvider(classification);
+
+    if (requiresDataset(request.taskType) && !request.dataSetId) {
+      yield { delta: buildNoDatasetResponse(decision.providerName, decision.model).content, done: true };
+      return;
+    }
+
     if (!decision.provider.stream) {
       const response = await this.generate(request);
       yield { delta: response.content, done: true };

@@ -28,6 +28,8 @@ export const aiRequestSchema = z.object({
   mode: z.enum(RESPONSE_MODES).optional(),
   context: z.string().max(50_000).optional(),
   requireVerification: z.boolean().optional(),
+  /** If given, the turn is appended to this existing ai_conversations row instead of starting a new one. */
+  conversationId: z.string().uuid().optional(),
 });
 
 export type ValidatedAIRequest = z.infer<typeof aiRequestSchema>;

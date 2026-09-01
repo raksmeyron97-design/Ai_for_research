@@ -79,6 +79,17 @@ export function getMaxContextTokens(): number {
   return raw ? Number(raw) : 32_000;
 }
 
+/** Embeddings aren't a chat/generation task, so they don't go through TASK_META tiers — one dedicated model. */
+export function getEmbeddingModel(): string {
+  return readModelEnv("GEMINI_EMBEDDING_MODEL") ?? "gemini-embedding-001";
+}
+
+/** Must match the `vector(N)` column width in supabase/migrations/*_phase3_document_chunks.sql. */
+export function getEmbeddingDimensions(): number {
+  const raw = readModelEnv("GEMINI_EMBEDDING_DIMENSIONS");
+  return raw ? Number(raw) : 768;
+}
+
 export function requireApiKey(provider: ProviderName): string {
   const key =
     provider === "gemini"

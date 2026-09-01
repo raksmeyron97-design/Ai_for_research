@@ -88,11 +88,33 @@ export interface Source {
   snippet?: string;
 }
 
+export type IssueSeverity = "critical" | "high" | "medium" | "low" | "informational";
+
+/**
+ * Doubles as the master spec's "ResearchValidationIssue" (§20) — that
+ * shape (severity/category/section/message/recommendation) is exactly
+ * ResearchWarning plus a `section` field, so this is one type rather than
+ * two near-duplicates. `section` is a plain string, not `SectionType`
+ * (from db/types.ts), to keep this foundational types file free of a
+ * dependency on the db layer.
+ */
 export interface ResearchWarning {
-  severity: "critical" | "high" | "medium" | "low" | "informational";
+  severity: IssueSeverity;
   category: string;
+  section?: string;
   message: string;
   recommendation?: string;
+}
+
+/** Section 33's score breakdown — always presented as an "AI Quality Estimate," never an official grade. */
+export interface QualityScoreBreakdown {
+  methodology: number;
+  evidence: number;
+  alignment: number;
+  writing: number;
+  references: number;
+  dataIntegrity: number;
+  overall: number;
 }
 
 /** Normalized request shape for every AI call in the app (Section 45). */
@@ -110,6 +132,14 @@ export interface AIRequest {
   context?: string;
   /** Force dual-model verification regardless of classifier output. */
   requireVerification?: boolean;
+  /**
+   * JSON Schema for structured output. When set, the provider is asked to
+   * use its native structured-output mode (Gemini's responseSchema,
+   * OpenAI's json_schema response format) rather than free text — the
+   * caller then JSON.parses `AIResponse.content` with confidence it
+   * matches the schema, instead of regex-scraping prose (spec §36).
+   */
+  responseSchema?: Record<string, unknown>;
 }
 
 /** Normalized response shape for every AI call in the app (Section 46). */
@@ -145,6 +175,7 @@ export interface ProviderGenerateRequest {
   prompt: string;
   maxOutputTokens?: number;
   temperature?: number;
+  responseSchema?: Record<string, unknown>;
 }
 
 export interface AIProvider {

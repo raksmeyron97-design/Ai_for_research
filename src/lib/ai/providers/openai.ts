@@ -41,6 +41,16 @@ export const OpenAIProvider: AIProvider = {
         input: request.prompt,
         max_output_tokens: request.maxOutputTokens,
         temperature: request.temperature,
+        ...(request.responseSchema && {
+          text: {
+            format: {
+              type: "json_schema",
+              name: "response",
+              schema: request.responseSchema,
+              strict: true,
+            },
+          },
+        }),
       });
 
       return {
@@ -77,7 +87,6 @@ export const OpenAIProvider: AIProvider = {
     }
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- signature must match AIProvider.countTokens
   async countTokens(_request: TokenCountRequest): Promise<TokenUsage> {
     // OpenAI does not expose a server-side token counting endpoint; the
     // TokenManager falls back to a local estimate for this provider.

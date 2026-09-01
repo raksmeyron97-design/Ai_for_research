@@ -1,9 +1,9 @@
 # AI Benchmark — latest run
 
 - **Status:** NOT READY
-- **Run:** `run_2026-09-01T06-14-59-587Z_9ab42cb7` (suite: full, benchmark v16.0.0)
-- **Commit:** 63f17e7
-- **Timestamp:** 2026-09-01T06:14:59.719Z
+- **Run:** `run_2026-09-01T10-17-15-773Z_e085ca98` (suite: full, benchmark v16.0.0)
+- **Commit:** f67f3cd
+- **Timestamp:** 2026-09-01T10:17:15.892Z
 - **Execution modes:** MOCKED=366
 
 > **Read this before quoting any number below.**
@@ -104,23 +104,23 @@
 | n | 15 | 15 | 168 | 168 |
 | min | 0 ms | 0 ms | 0 ms | 0 ms |
 | median | 0 ms | 0 ms | 0 ms | 0 ms |
-| p95 | 0 ms | 1 ms | 1 ms | 0 ms |
-| max | 0 ms | 1 ms | 1 ms | 1 ms |
+| p95 | 1 ms | 1 ms | 0 ms | 0 ms |
+| max | 1 ms | 1 ms | 1 ms | 1 ms |
 
 ## Tokens and cost
 
 | Metric | gemini / stub-deterministic-v1 (variant B) | openai / stub-deterministic-v1 (variant B) | gemini / stub-deterministic-v1 (variant A) | openai / stub-deterministic-v1 (variant A) |
 | --- | --- | --- | --- | --- |
-| Median input tokens | 382.0 | 382.0 | 218.0 | 218.0 |
+| Median input tokens | 382.0 | 382.0 | 223.0 | 223.0 |
 | Median output tokens | 72.0 | 72.0 | 72.0 | 72.0 |
-| Median total tokens | 454.0 | 454.0 | 291.0 | 291.0 |
+| Median total tokens | 454.0 | 454.0 | 296.0 | 296.0 |
 | Median reasoning/thinking tokens | n/a | n/a | n/a | n/a |
-| Median retrieved-context tokens | 349.0 | 349.0 | 182.0 | 182.0 |
+| Median retrieved-context tokens | 349.0 | 349.0 | 187.0 | 187.0 |
 | Usage from provider / estimated | 15 / 0 | 15 / 0 | 168 / 0 | 168 / 0 |
 | Cost per request | n/a | n/a | n/a | n/a |
 | Cost per successful answer | n/a | n/a | n/a | n/a |
 | Rate source | unverified_placeholder | unverified_placeholder | unverified_placeholder | unverified_placeholder |
-| Quality per 1K tokens | 120.0 | 120.0 | 184.6 | 184.6 |
+| Quality per 1K tokens | 120.0 | 120.0 | 181.5 | 181.5 |
 
 ## Failures
 
@@ -191,5 +191,5 @@ _32 further failures in `latest.json`._
 
 ## Recommendations
 
-- No live model measurement exists. Set GEMINI_API_KEY and/or OPENAI_API_KEY and re-run `npm run ai:benchmark:full` before making any model-selection decision.
+- No live model measurement exists: no provider credential was available. Set GEMINI_API_KEY and/or OPENAI_API_KEY and re-run `npm run ai:benchmark:full` before making any model-selection decision.
 

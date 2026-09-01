@@ -188,6 +188,13 @@ export interface ProviderGenerateRequest {
   maxOutputTokens?: number;
   temperature?: number;
   responseSchema?: Record<string, unknown>;
+  /**
+   * Cancellation signal, forwarded by each adapter to its SDK so that
+   * `withRetry`'s timeout actually aborts the in-flight HTTP request.
+   * Before Phase 16 the signal was created and dropped, which made the
+   * timeout inert (report finding F1).
+   */
+  signal?: AbortSignal;
 }
 
 export interface AIProvider {

@@ -22,7 +22,7 @@ function execution(overrides: Partial<ExecutionRecord> = {}): ExecutionRecord {
     apiMode: "test",
     mode: "LIVE",
     variant: "A",
-    contextFormat: "production",
+    contextFormat: "keyed",
     repetition: 1,
     latencyMs: 1000,
     firstTokenMs: null,

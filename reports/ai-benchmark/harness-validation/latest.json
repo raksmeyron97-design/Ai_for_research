@@ -2,9 +2,9 @@
   "phase": 16,
   "status": "NOT READY",
   "benchmark_version": "16.0.0",
-  "run_id": "run_2026-09-01T06-14-59-587Z_9ab42cb7",
-  "timestamp": "2026-09-01T06:14:59.719Z",
-  "commit": "63f17e7",
+  "run_id": "run_2026-09-01T10-17-15-773Z_e085ca98",
+  "timestamp": "2026-09-01T10:17:15.892Z",
+  "commit": "f67f3cd",
   "suite": "full",
   "execution_modes": {
     "MOCKED": 366
@@ -80,8 +80,8 @@
       "n": 15,
       "min": 0,
       "median": 0,
-      "p95": 0,
-      "max": 0
+      "p95": 1,
+      "max": 1
     },
     "openai:stub-deterministic-v1:variantB": {
       "n": 15,
@@ -94,7 +94,7 @@
       "n": 168,
       "min": 0,
       "median": 0,
-      "p95": 1,
+      "p95": 0,
       "max": 1
     },
     "openai:stub-deterministic-v1:variantA": {
@@ -125,20 +125,20 @@
       "estimated": 0
     },
     "gemini:stub-deterministic-v1:variantA": {
-      "medianInput": 218,
+      "medianInput": 223,
       "medianOutput": 72,
-      "medianTotal": 291,
+      "medianTotal": 296,
       "medianReasoning": null,
-      "medianRetrievedContext": 182,
+      "medianRetrievedContext": 187,
       "providerReported": 168,
       "estimated": 0
     },
     "openai:stub-deterministic-v1:variantA": {
-      "medianInput": 218,
+      "medianInput": 223,
       "medianOutput": 72,
-      "medianTotal": 291,
+      "medianTotal": 296,
       "medianReasoning": null,
-      "medianRetrievedContext": 182,
+      "medianRetrievedContext": 187,
       "providerReported": 168,
       "estimated": 0
     }
@@ -1426,7 +1426,7 @@
     }
   ],
   "recommendations": [
-    "No live model measurement exists. Set GEMINI_API_KEY and/or OPENAI_API_KEY and re-run `npm run ai:benchmark:full` before making any model-selection decision."
+    "No live model measurement exists: no provider credential was available. Set GEMINI_API_KEY and/or OPENAI_API_KEY and re-run `npm run ai:benchmark:full` before making any model-selection decision."
   ],
   "caveats": [
     "**This run is MOCKED.** Every response came from the deterministic stub in `runners/stub-provider.ts`, not from a model. It validates the harness, and says nothing whatsoever about Gemini or OpenAI quality.",

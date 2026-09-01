@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createConversation, getConversation, insertMessage } from "@/lib/db";
 import { getProject } from "@/lib/db/projects";
-import { requiresDataset } from "@/lib/ai/integrity-guard";
+import { requiresDataset, verifyCitationsInText } from "@/lib/ai/integrity-guard";
 import { AIOrchestrator } from "@/lib/ai/orchestrator";
 import { resolveRequestContext } from "@/lib/ai/prepare-request";
 import { detectPromptInjection } from "@/lib/ai/prompt-injection-guard";
@@ -105,6 +105,33 @@ export async function POST(req: Request) {
       } catch {
         controller.enqueue(encoder.encode("\n[AI response interrupted — please retry.]"));
       } finally {
+        // Phase 16 finding F3: this route returned model output with no
+        // citation check at all, while quality-check and the discussion
+        // generator both ran one. It is the highest-traffic AI surface, so
+        // an invented citation key was most likely to reach a thesis from
+        // here.
+        //
+        // Verification runs after the stream because a citation key can
+        // only be checked once the sentence containing it is complete, and
+        // AIChunk carries no channel for structured warnings. The note is
+        // appended to the same text stream, the way the injection warning
+        // is prepended — visible to the researcher without blocking or
+        // rewriting the answer they already read.
+        if (assistantContent) {
+          try {
+            const citationWarnings = await verifyCitationsInText(supabase, project.id, assistantContent);
+            if (citationWarnings.length > 0) {
+              controller.enqueue(
+                encoder.encode(
+                  `\n\n[Citation check: ${citationWarnings.map((w) => w.message).join(" ")}]`,
+                ),
+              );
+            }
+          } catch {
+            // Verification is best-effort: never turn a delivered answer
+            // into a failure because the check itself could not run.
+          }
+        }
         controller.close();
         if (assistantContent) {
           await insertMessage(supabase, {

@@ -198,7 +198,7 @@ function resultWith(overrides: {
   const execution: ExecutionRecord = {
     timestamp: "t", runId: "r", benchmarkVersion: "16.0.0", scenarioId: "s", category: "rag_grounding",
     provider: "gemini", model: "m", sdkVersion: "1", apiMode: "a", mode: "LIVE", variant: "A",
-    contextFormat: "production", repetition: 1, latencyMs: 10, firstTokenMs: null, attempts: 1, retries: 0,
+    contextFormat: "keyed", repetition: 1, latencyMs: 10, firstTokenMs: null, attempts: 1, retries: 0,
     ok: true, output: "o",
     tokens: { retrievedContextTokens: 0, promptTokens: 0, fromProvider: false },
     cost: { estimatedCostUsd: null, rateSource: "unknown_model" },

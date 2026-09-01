@@ -1,9 +1,9 @@
 # AI Benchmark — latest run
 
 - **Status:** NOT READY
-- **Run:** `run_2026-09-01T07-35-38-564Z_f210276a` (suite: smoke, benchmark v16.0.0)
-- **Commit:** fdba50b
-- **Timestamp:** 2026-09-01T07:35:57.119Z
+- **Run:** `run_2026-09-01T10-17-18-256Z_8cc4f100` (suite: smoke, benchmark v16.0.0)
+- **Commit:** f67f3cd
+- **Timestamp:** 2026-09-01T10:17:36.651Z
 - **Execution modes:** UNAVAILABLE=12
 
 > **Read this before quoting any number below.**

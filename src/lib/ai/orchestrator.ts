@@ -23,13 +23,14 @@ async function callProvider(
 ): Promise<AIResponse> {
   const maxOutputTokens = getMaxOutputTokens();
   return withRetry(
-    () =>
+    (signal) =>
       decision.provider.generate({
         model: decision.model,
         systemInstruction,
         prompt,
         maxOutputTokens,
         responseSchema,
+        signal,
       }),
     { retries: 1, timeoutMs: 45_000 },
   );

@@ -4,26 +4,23 @@ import { getCorpus } from "./corpus";
 /**
  * Two ways of handing retrieved evidence to the model.
  *
- * `production` reproduces `src/lib/ai/context-manager.ts`'s `formatChunks`
- * exactly: excerpts are numbered `[1] (page N)`, because `ChunkSearchResult`
- * has no citation key to print — `document_chunks` is not joined to
- * `research_citations` anywhere in the schema. That matters, because every
- * task prompt (see `src/lib/ai/prompts/*.ts`) instructs the model to cite
- * "its exact [citation_key] from context", and
- * `integrity-guard.ts:verifyCitationKeys` checks bracket tokens against
- * `research_citations`. A model grounding on retrieved chunks in production
- * therefore has no key it can emit that would verify.
+ * `keyed` is what `src/lib/ai/context-manager.ts` does now: each excerpt is
+ * labelled with the citation key of its source, so a grounded answer can
+ * emit a key that `integrity-guard.ts:verifyCitationKeys` resolves.
  *
- * `keyed` is the counterfactual: identical evidence, labelled with the
- * citation key. Running both is how the benchmark distinguishes "the model
- * cannot cite" from "the pipeline never gave it anything citable" — a
- * distinction the report needs before recommending a prompt change over a
- * schema change.
+ * `numbered` is what it did before the Phase 16 F2 fix — excerpts numbered
+ * `[1]`, `[2]`, ... because `match_document_chunks` returned no citation
+ * key, while every task prompt asked the model to cite `[citation_key]`.
+ * It is kept, and not deleted with the bug, so the benchmark can quantify
+ * what that fix actually bought once a live run is possible: run the same
+ * scenarios under both and compare citation correctness. A regression that
+ * silently reverted the join would show up as the two formats scoring the
+ * same.
  */
-export type ContextFormat = "production" | "keyed";
+export type ContextFormat = "keyed" | "numbered";
 
 function renderExcerpt(source: BenchmarkSource, index: number, format: ContextFormat): string {
-  const label = format === "production" ? `[${index + 1}]` : `[${source.citationKey}]`;
+  const label = format === "numbered" ? `[${index + 1}]` : `[${source.citationKey}]`;
   return `${label}: ${source.content}`;
 }
 
@@ -48,7 +45,7 @@ export interface BuiltContext {
  */
 export function buildScenarioContext(
   scenario: BenchmarkScenario,
-  format: ContextFormat = "production",
+  format: ContextFormat = "keyed",
 ): BuiltContext {
   if (!scenario.corpus || !scenario.retrievedKeys?.length) {
     return { text: "", sources: [], format };

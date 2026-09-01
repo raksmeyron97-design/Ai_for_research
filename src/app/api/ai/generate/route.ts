@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { AllProvidersFailedError } from "@/lib/ai/errors";
-import { requiresDataset } from "@/lib/ai/integrity-guard";
+import { requiresDataset, verifyCitationsInText } from "@/lib/ai/integrity-guard";
 import { AIOrchestrator } from "@/lib/ai/orchestrator";
 import { resolveRequestContext } from "@/lib/ai/prepare-request";
 import { aiRequestSchema } from "@/lib/ai/request-schema";
@@ -56,7 +56,18 @@ export async function POST(req: Request) {
       ? parsed.data
       : await resolveRequestContext(supabase, parsed.data);
     const response = await orchestrator.generate(requestWithContext);
-    return NextResponse.json(response);
+
+    // Same gap as /api/ai/chat (finding F3). Here there is a structured
+    // channel for it, so the warnings ride along on AIResponse.warnings
+    // rather than being appended to the text.
+    let warnings = response.warnings ?? [];
+    try {
+      warnings = [...warnings, ...(await verifyCitationsInText(supabase, project.id, response.content))];
+    } catch {
+      // Best-effort, as above.
+    }
+
+    return NextResponse.json(warnings.length > 0 ? { ...response, warnings } : response);
   } catch (err) {
     if (err instanceof AllProvidersFailedError) {
       return NextResponse.json(

@@ -34,6 +34,12 @@ export const GeminiProvider: AIProvider = {
           systemInstruction: request.systemInstruction,
           maxOutputTokens: request.maxOutputTokens,
           temperature: request.temperature,
+          // Client-side cancellation: this frees the socket and unblocks the
+          // caller. Google's docs are explicit that it does not cancel the
+          // operation server-side, so an aborted request may still be
+          // billed — the point is that we stop waiting, not that we stop
+          // paying.
+          abortSignal: request.signal,
           ...(request.responseSchema && {
             responseMimeType: "application/json",
             responseSchema: toGeminiSchema(request.responseSchema),
@@ -61,6 +67,7 @@ export const GeminiProvider: AIProvider = {
           systemInstruction: request.systemInstruction,
           maxOutputTokens: request.maxOutputTokens,
           temperature: request.temperature,
+          abortSignal: request.signal,
         },
       });
 

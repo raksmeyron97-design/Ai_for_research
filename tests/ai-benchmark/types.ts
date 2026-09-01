@@ -173,7 +173,7 @@ export interface ExecutionRecord {
   mode: ExecutionMode;
   variant: Variant;
   /** Which context rendering was used — see fixtures/context.ts. */
-  contextFormat: "production" | "keyed" | "none";
+  contextFormat: "keyed" | "numbered" | "none";
   repetition: number;
   latencyMs: number;
   /** Time to first token; only measurable on the streaming path. */

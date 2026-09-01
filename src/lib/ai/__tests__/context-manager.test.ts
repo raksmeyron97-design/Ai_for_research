@@ -21,6 +21,7 @@ interface FakeChunk {
   content: string;
   page: number | null;
   section: string | null;
+  citation_key: string | null;
   similarity: number;
 }
 
@@ -116,7 +117,7 @@ describe("buildContext", () => {
 
   it("embeds the query and includes retrieved excerpts when a query is given", async () => {
     dbChunks.searchChunks.mockResolvedValueOnce([
-      { id: "c1", document_id: "d1", chunk_index: 0, content: "Adherence to iron supplements was low.", page: 4, section: null, similarity: 0.9 },
+      { id: "c1", document_id: "d1", chunk_index: 0, content: "Adherence to iron supplements was low.", page: 4, section: null, citation_key: null, similarity: 0.9 },
     ]);
     const context = await buildContext(supabase, { projectId: "proj-1", query: "supplement adherence" });
     expect(embeddingsMock.embedQuery).toHaveBeenCalledWith("supplement adherence");
@@ -126,8 +127,8 @@ describe("buildContext", () => {
 
   it("post-filters retrieved chunks to the given documentIds", async () => {
     dbChunks.searchChunks.mockResolvedValueOnce([
-      { id: "c1", document_id: "keep-me", chunk_index: 0, content: "kept chunk", page: null, section: null, similarity: 0.9 },
-      { id: "c2", document_id: "drop-me", chunk_index: 0, content: "dropped chunk", page: null, section: null, similarity: 0.8 },
+      { id: "c1", document_id: "keep-me", chunk_index: 0, content: "kept chunk", page: null, section: null, citation_key: null, similarity: 0.9 },
+      { id: "c2", document_id: "drop-me", chunk_index: 0, content: "dropped chunk", page: null, section: null, citation_key: null, similarity: 0.8 },
     ]);
     const context = await buildContext(supabase, {
       projectId: "proj-1",
@@ -163,7 +164,7 @@ describe("buildContext", () => {
     spy.mockReturnValue(40); // tiny budget — forces pruning
 
     dbChunks.searchChunks.mockResolvedValueOnce([
-      { id: "c1", document_id: "d1", chunk_index: 0, content: "x".repeat(300), page: null, section: null, similarity: 0.9 },
+      { id: "c1", document_id: "d1", chunk_index: 0, content: "x".repeat(300), page: null, section: null, citation_key: null, similarity: 0.9 },
     ]);
     dbMessages.getRecentMessages.mockResolvedValueOnce([{ role: "user", content: "y".repeat(300) }]);
 
@@ -202,5 +203,72 @@ describe("buildContext", () => {
     expect(context).toContain("## Project Profile");
     expect(context).not.toContain("## Relevant Document Excerpts");
     spy.mockRestore();
+  });
+});
+
+/**
+ * Phase 16 finding F2. Retrieved excerpts used to be numbered [1], [2], ...
+ * because `match_document_chunks` returned no citation key, while every task
+ * prompt asked the model to cite `[citation_key]`. The model had nothing
+ * citable, so a grounded answer could not produce a citation that
+ * `verifyCitationKeys()` would resolve.
+ */
+describe("retrieved excerpts are citable (F2)", () => {
+  const chunk = (over: Partial<FakeChunk> = {}): FakeChunk => ({
+    id: "c1",
+    document_id: "d1",
+    chunk_index: 0,
+    content: "Prevalence of probable antenatal depression was 21.4%.",
+    page: 4,
+    section: null,
+    citation_key: "sok2024antenatal",
+    similarity: 0.9,
+    ...over,
+  });
+
+  it("labels an excerpt with the citation key of its linked source", async () => {
+    dbChunks.searchChunks.mockResolvedValueOnce([chunk()]);
+    const context = await buildContext(supabase, { projectId: "proj-1", query: "prevalence" });
+
+    expect(context).toContain("[sok2024antenatal] (page 4): Prevalence");
+    expect(context).not.toContain("[1]");
+  });
+
+  it("emits a key the production citation extractor resolves", async () => {
+    const { extractCitationKeys } = await import("../integrity-guard");
+    dbChunks.searchChunks.mockResolvedValueOnce([chunk()]);
+    const context = await buildContext(supabase, { projectId: "proj-1", query: "prevalence" });
+
+    expect(extractCitationKeys(context)).toContain("sok2024antenatal");
+  });
+
+  it("marks an unlinked document's excerpt as uncitable instead of inventing a key", async () => {
+    dbChunks.searchChunks.mockResolvedValueOnce([chunk({ citation_key: null, page: null })]);
+    const context = await buildContext(supabase, { projectId: "proj-1", query: "prevalence" });
+
+    expect(context).toContain("[excerpt 1 (source not linked)]");
+  });
+
+  it("keeps an uncitable label out of the citation extractor's reach", async () => {
+    const { extractCitationKeys } = await import("../integrity-guard");
+    dbChunks.searchChunks.mockResolvedValueOnce([chunk({ citation_key: null })]);
+    const context = await buildContext(supabase, { projectId: "proj-1", query: "prevalence" });
+
+    // The space inside the brackets keeps /\[([a-zA-Z0-9_-]+)\]/ from
+    // scraping the label out as a citation the model never claimed.
+    expect(extractCitationKeys(context)).toEqual([]);
+  });
+
+  it("handles a mix of linked and unlinked excerpts", async () => {
+    dbChunks.searchChunks.mockResolvedValueOnce([
+      chunk({ id: "c1", citation_key: "sok2024antenatal" }),
+      chunk({ id: "c2", document_id: "d2", citation_key: null, page: null }),
+      chunk({ id: "c3", document_id: "d3", citation_key: "meas2023postpartum", page: null }),
+    ]);
+    const context = await buildContext(supabase, { projectId: "proj-1", query: "prevalence" });
+
+    expect(context).toContain("[sok2024antenatal]");
+    expect(context).toContain("[excerpt 2 (source not linked)]");
+    expect(context).toContain("[meas2023postpartum]");
   });
 });

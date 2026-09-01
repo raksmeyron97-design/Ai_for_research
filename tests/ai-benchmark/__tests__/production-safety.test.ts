@@ -26,10 +26,13 @@ function readAll(dir: string, ext = ".ts"): { file: string; content: string }[] 
 }
 
 describe("provider secrets stay server-side", () => {
-  const sources = readAll(path.join(ROOT, "src"));
+  const all = readAll(path.join(ROOT, "src"));
+  // The invariant is about shipped code. Unit tests legitimately assign a
+  // dummy key to process.env to exercise the adapters against a mocked SDK.
+  const sources = all.filter(({ file }) => !file.includes("__tests__"));
 
   it("never reads a provider key from a NEXT_PUBLIC_ variable", () => {
-    for (const { file, content } of sources) {
+    for (const { file, content } of all) {
       expect(content, `${file} exposes a provider key to the browser`).not.toMatch(
         /NEXT_PUBLIC_[A-Z_]*(GEMINI|OPENAI|API_KEY)/,
       );

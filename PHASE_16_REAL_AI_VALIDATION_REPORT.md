@@ -269,19 +269,24 @@ No model failures exist to analyse. What follows are **measured defects in the
 shipped AI system**, found by the Step 1 audit. Full detail and file:line
 references in `AI_ARCHITECTURE_INVENTORY.md`.
 
-### F1 — The provider timeout does not time out
+### F1 — The provider timeout does not time out — **FIXED**
 **Severity:** high · **Reproducible:** yes (static)
 **Observed:** `errors.ts:withRetry` creates an `AbortController` and passes the
 signal to its callback, but `providers/gemini.ts` and `providers/openai.ts`
 never accept or forward it, and there is no `Promise.race`.
 **Expected:** a provider call exceeding `timeoutMs` is cancelled.
 **Category:** `TIMEOUT` · **Cause:** the signal is created and dropped.
-**Fix:** forward `AbortSignal` to both SDKs (both accept one), or race the call.
-The orchestrator's `timeoutMs: 45_000` is currently inert; a hung connection
-blocks indefinitely. The Phase 16 harness implements its own `withTimeout`
-rather than inheriting this.
+**Fixed:** `ProviderGenerateRequest` carries a `signal`; Gemini forwards it as
+`config.abortSignal`, OpenAI as the `RequestOptions` second argument, and the
+orchestrator passes `withRetry`'s signal through. `withRetry` additionally races
+the call against its timer and rejects with a new `AITimeoutError`. Both
+mechanisms are deliberate: the signal is the real cancellation, the race is a
+backstop so that an adapter which forgets to forward it degrades into a leaked
+request rather than back into this bug. Google's docs note aborting is
+client-side only — an aborted call may still be billed; we stop waiting, not
+paying. 10 regression tests in `src/lib/ai/__tests__/timeout-abort.test.ts`.
 
-### F2 — Retrieved chunks carry no citable identifier
+### F2 — Retrieved chunks carry no citable identifier — **FIXED**
 **Severity:** high · **Reproducible:** yes (pinned by a test)
 **Observed:** `document_chunks` has no link to `research_citations`, and
 `ChunkSearchResult` has no citation key, so `context-manager.ts:formatChunks`
@@ -294,20 +299,45 @@ that verifies.
 against `research_citations` — but retrieval provides no such key. The model can
 only cite the separate "Relevant Sources" layer, populated from `sourceIds` the
 caller passes explicitly, **not** from retrieval.
-**Fix:** join chunks to their source and render the key on the excerpt. This is
-the most consequential finding in the phase — it means the citation-verification
-loop and the retrieval loop are structurally disconnected. It is also the reason
-prompt tuning should not be attempted first: the model may not be failing to
-cite, it may have nothing citable. The A/B (below) is built to settle this.
+**Fixed by schema change, not by prompt** — which was the point of not tuning
+prompts first: the model was not failing to cite, it had nothing citable.
 
-### F3 — Citation verification does not run on the main chat path
+Migration `20260901060000_phase16_chunk_citation_link.sql` adds
+`research_documents.citation_id` (nullable, `on delete set null`) and rebuilds
+`match_document_chunks` to return `citation_key` through a LEFT JOIN.
+`context-manager.ts` now labels each excerpt `[citation_key]`, or
+`[excerpt N (source not linked)]` when the document has no source — never an
+invented key. The space inside those brackets keeps `extractCitationKeys`
+(whose regex is `\[([a-zA-Z0-9_-]+)\]`) from scraping the placeholder back out
+as a citation the model never claimed, which also removes the F11
+false-positive for excerpts.
+
+The link is on the document, not the chunk: a source is a property of the file,
+so two chunks of one PDF cannot claim different sources. `PATCH
+/api/research/projects/[projectId]/documents/[documentId]` sets or clears it,
+rejecting a citation belonging to a different project — RLS would allow one of
+the user's *own* other projects through, and `verifyCitationKeys` scopes by
+project, so that would silently produce an unverifiable key.
+
+**Verified against the running local Postgres**, not just typechecked: linked
+chunks return `sok2024antenatal`, unlinked return `null`, `prosecdef` is still
+`false` (RLS applies), and deleting the source nulls the key while leaving the
+document and its chunks intact.
+
+### F3 — Citation verification does not run on the main chat path — **FIXED**
 **Severity:** high · **Reproducible:** yes (static)
 **Observed:** `verifyCitationsInText` is called from `quality-check.ts` and
 `discussion-generator.ts` only. `/api/ai/chat` (the AI Copilot, the highest-
 traffic surface) and `/api/ai/generate` return model output with no citation
 check at all.
-**Fix:** run verification on both routes; for the streaming route, verify the
-accumulated text before persisting the assistant message.
+**Fixed:** chat verifies the accumulated answer once the stream completes and
+appends a `[Citation check: ...]` note to the same text stream — `AIChunk`
+carries no structured channel, and a key cannot be checked until its sentence is
+complete, so this mirrors how the injection warning is already surfaced. Generate
+attaches the warnings to `AIResponse.warnings`, where a structured channel does
+exist. Both are best-effort: a verification that throws never converts a
+delivered answer into a failure. 9 tests in
+`src/app/api/__tests__/ai-citation-verification.test.ts`.
 
 ### F6 — Streamed responses have no provider token counts
 **Severity:** medium · **Reproducible:** yes (static)
@@ -472,17 +502,18 @@ One candidate is **built and ready to test**, not applied
 (`runners/variants.ts`). The A/B changes exactly one thing at a time across five
 designated scenarios:
 
-- **Variant A** — production as shipped: `buildSystemInstruction()` verbatim,
-  excerpts numbered `[1]` the way `context-manager.ts` renders them.
+- **Variant A** — production as shipped: `buildSystemInstruction()` verbatim.
 - **Variant B** — same instruction plus a short citation contract (cite only the
   bracketed key shown on each excerpt; never invent one; if excerpts disagree,
-  report both; if they do not answer the question, say so), **with excerpts
-  labelled by citation key**.
+  report both; if they do not answer the question, say so).
 
-This is designed to separate two explanations that look identical from the
-outside: *the model cannot cite correctly* versus *the pipeline never gave it
-anything citable* (F2). Until it runs, rewriting prompts would be guessing, and
-would risk "fixing" a prompt to work around a schema defect.
+Both arms now receive citation-keyed excerpts, because that is what production
+does since the F2 fix. Before it, the arms also differed in context format,
+which confounded them — a difference could have meant "the prompt helped" *or*
+"the model finally had something citable". With F2 fixed in the schema, the
+remaining question is narrow: does the addendum add anything on top? The
+pre-F2 `numbered` renderer is kept in the harness (not deleted with the bug) so
+a live run can also quantify what the schema fix itself bought.
 
 The harness reports the citation-correctness delta between arms and states
 explicitly whether it justifies a production change.
@@ -505,17 +536,23 @@ explicitly whether it justifies a production change.
 - Secrets: one read site, server-side only, nothing `NEXT_PUBLIC_`, no key in
   any API response. Verified and now pinned by tests.
 
+**Done** (this phase): F1, F2, F3 — see the failure analysis above.
+
 **Improve, in priority order:**
 
-1. **F2** — join `document_chunks` to `research_citations` and render the
-   citation key on retrieved excerpts. Highest leverage in the phase.
-2. **F1** — forward `AbortSignal` to both SDKs so the timeout is real.
-3. **F3** — run citation verification on `/api/ai/chat` and `/api/ai/generate`.
-4. **F6** — capture usage metadata on both streaming paths.
-5. **F7** — replace `RATE_TABLE` with verified rates and a `verified_on` date,
+1. **F6** — capture usage metadata on both streaming paths. Until this lands,
+   the admin cost dashboard is reporting estimates for its highest-volume route.
+2. **F7** — replace `RATE_TABLE` with verified rates and a `verified_on` date,
    and bill reasoning tokens (now captured) in `calculateCost()`.
-6. **F10** — tolerate a markdown code fence before `JSON.parse`.
-7. **F11** — restrict `extractCitationKeys` to key-shaped tokens.
+3. **F10** — tolerate a markdown code fence before `JSON.parse`.
+4. **F11** — restrict `extractCitationKeys` to key-shaped tokens. The F2 fix
+   removed the common false positive (numbered excerpts), but a `[Note]` in
+   prose still matches.
+5. **UI for F2's link.** The schema, retrieval, rendering and API all carry the
+   citation key now, but nothing in the documents panel lets a researcher pick
+   which source an upload is. Until that exists, `citation_id` stays null for
+   real uploads and excerpts render as uncitable — correct behaviour, but the
+   fix is not yet reaching users.
 
 **Remove:** the seven dead feature flags and `AI_DEFAULT_PROVIDER` from
 `.env.example`, plus `GEMINI_ADVANCED_MODEL` / `OPENAI_STANDARD_MODEL`, or wire
@@ -540,11 +577,14 @@ Two independent reasons, either sufficient:
    hallucination rate, Khmer quality, latency or cost is supported by evidence.
    "The architecture is implemented" is exactly the assumption Phase 16 existed
    to replace, and it remains an assumption.
-2. **Four measured defects affect production today**, independent of model
-   quality: the timeout does not time out (F1); retrieval and citation
-   verification are structurally disconnected (F2); the highest-traffic AI route
-   performs no citation verification at all (F3); and most usage/cost data in
-   the admin dashboard is estimated rather than measured (F6).
+2. **Measured defects.** Three of the four that affected production have been
+   fixed in this phase — the timeout now actually cancels (F1), retrieval
+   excerpts carry a verifiable citation key (F2), and both AI routes verify
+   citations (F3). **F6 remains**: usage/cost data for the highest-volume route
+   is still estimated rather than measured, so the admin dashboard's cost
+   figures cannot be trusted. F2's fix is also not yet reachable by users —
+   there is no UI to link an upload to a source, so `citation_id` stays null in
+   practice.
 
 This is not a finding that the AI performs badly. It is a finding that its
 performance is **unknown**, in a system where the cost of a fabricated citation
@@ -597,6 +637,7 @@ still writes a report.
 | Harness validation (MOCKED) | `reports/ai-benchmark/harness-validation/` |
 | Pricing template | `reports/ai-benchmark/pricing.example.json` |
 | Harness tests | `tests/ai-benchmark/__tests__/` — 110 tests |
+| F1/F2/F3 regression tests | `src/lib/ai/__tests__/timeout-abort.test.ts`, `src/lib/ai/__tests__/context-manager.test.ts`, `src/app/api/__tests__/ai-citation-verification.test.ts` |
 
 Raw per-execution dumps are written to `reports/ai-benchmark/**/raw/` and
 git-ignored: each full run produces megabytes of response text, and
@@ -609,7 +650,7 @@ contains a credential.
 
 | Command | What it does |
 | --- | --- |
-| `npm test` | Full suite, 445 tests, no network |
+| `npm test` | Full suite, 469 tests, no network |
 | `npm run ai:models` | Live provider preflight + model discovery |
 | `npm run ai:benchmark:smoke` | 3 scenarios — wiring and cost validation |
 | `npm run ai:benchmark:full` | All 56 scenarios, 3 repetitions |

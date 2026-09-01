@@ -120,17 +120,16 @@ describe("benchmark scenario suite", () => {
 describe("scenario context rendering", () => {
   const scenario = ALL_SCENARIOS.find((s) => s.id === "rag-c1-prevalence-single")!;
 
-  it("renders production format without citation keys on excerpts", () => {
-    const { text } = buildScenarioContext(scenario, "production");
+  it("renders the production (keyed) format with citation keys on excerpts", () => {
+    const { text } = buildScenarioContext(scenario);
     expect(text).toContain("## Relevant Document Excerpts");
-    expect(text).toContain("[1]:");
-    // Production's formatChunks has no key to print — this is the finding the A/B measures.
-    expect(text).not.toContain("[sok2024antenatal]:");
+    expect(text).toContain("[sok2024antenatal]:");
   });
 
-  it("renders keyed format with citation keys on excerpts", () => {
-    const { text } = buildScenarioContext(scenario, "keyed");
-    expect(text).toContain("[sok2024antenatal]:");
+  it("can still render the pre-F2 numbered format, to quantify what the fix bought", () => {
+    const { text } = buildScenarioContext(scenario, "numbered");
+    expect(text).toContain("[1]:");
+    expect(text).not.toContain("[sok2024antenatal]:");
   });
 
   it("returns empty context for scenarios with no retrieval", () => {

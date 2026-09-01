@@ -143,6 +143,8 @@ export interface ResearchDocumentRow {
   extraction_status: ExtractionStatus;
   extracted_text: string | null;
   extraction_error: string | null;
+  /** The source record this document is, if it has been identified. */
+  citation_id: string | null;
   created_at: string;
 }
 
@@ -154,10 +156,14 @@ export interface ResearchDocumentInsert {
   mime_type?: string | null;
   size_bytes?: number | null;
   document_type?: DocumentType;
+  citation_id?: string | null;
 }
 
 export type ResearchDocumentUpdate = Partial<
-  Pick<ResearchDocumentRow, "extraction_status" | "extracted_text" | "extraction_error" | "document_type">
+  Pick<
+    ResearchDocumentRow,
+    "extraction_status" | "extracted_text" | "extraction_error" | "document_type" | "citation_id"
+  >
 >;
 
 // ---------------------------------------------------------------------
@@ -230,6 +236,14 @@ export interface ChunkSearchResult {
   content: string;
   page: number | null;
   section: string | null;
+  /**
+   * Citation key of the source this chunk's document was identified as, or
+   * null when the document has not been linked to a `research_citations`
+   * row. Null means "the model has nothing citable for this excerpt" — it
+   * must never be substituted with a placeholder key, because
+   * `verifyCitationKeys()` would then flag a key the model was handed.
+   */
+  citation_key: string | null;
   similarity: number;
 }
 

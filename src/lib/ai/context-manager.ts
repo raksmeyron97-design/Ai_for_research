@@ -91,10 +91,25 @@ function formatProjectProfile(project: ResearchProjectRow): string {
   return `## Project Profile\n${lines.join("\n")}`;
 }
 
+/**
+ * Labels each excerpt with the citation key of the source it came from, so a
+ * model grounding on retrieval can emit a key that
+ * `integrity-guard.ts:verifyCitationKeys()` will actually resolve. Before
+ * Phase 16 these were numbered `[1]`, `[2]`, ... while every task prompt
+ * asked for `[citation_key]` — the model had nothing citable (finding F2).
+ *
+ * An excerpt whose document has not been linked to a source is labelled
+ * `[excerpt N (source not linked)]` rather than given a number or an
+ * invented key. Two reasons: the parenthesised text tells the model plainly
+ * that it has no key to cite here, and the space inside the brackets keeps
+ * `extractCitationKeys()` — whose regex is `\[([a-zA-Z0-9_-]+)\]` — from
+ * scraping the label back out as if it were a citation the model claimed.
+ */
 function formatChunks(chunks: ChunkSearchResult[]): string {
   const entries = chunks.map((c, i) => {
     const loc = [c.page && `page ${c.page}`, c.section].filter(Boolean).join(", ");
-    return `[${i + 1}]${loc ? ` (${loc})` : ""}: ${c.content}`;
+    const label = c.citation_key ? `[${c.citation_key}]` : `[excerpt ${i + 1} (source not linked)]`;
+    return `${label}${loc ? ` (${loc})` : ""}: ${c.content}`;
   });
   return `## Relevant Document Excerpts\n${entries.join("\n\n")}`;
 }

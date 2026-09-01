@@ -106,7 +106,7 @@ fallback and a runtime `resolveFallback()` used after a call fails.
 | Chunk | `src/lib/documents/chunk.ts` |
 | Embed | `src/lib/ai/embeddings.ts` — Gemini `embedContent`, `RETRIEVAL_DOCUMENT` / `RETRIEVAL_QUERY` |
 | Store | `document_chunks`, `vector(768)`, HNSW cosine index |
-| Search | `match_document_chunks()` RPC, `SECURITY INVOKER`, always filtered by `project_id` |
+| Search | `match_document_chunks()` RPC, `SECURITY INVOKER`, always filtered by `project_id`, returns each chunk's `citation_key` |
 | Assemble | `context-manager.ts` — 5 layers, pruned newest-cheapest-first to `AI_MAX_CONTEXT_TOKENS` |
 
 Retrieval failure is caught and degraded to "no excerpts" rather than failing
@@ -119,8 +119,8 @@ the request (`context-manager.ts:57-73`).
 - Verification: `verifyCitationKeys()` — checks those tokens against
   `research_citations` for the project; unmatched keys become `high`-severity
   warnings.
-- **Call sites: two.** `quality-check.ts:42` and `discussion-generator.ts:63`.
-  Neither `/api/ai/chat` nor `/api/ai/generate` verifies citations.
+- **Call sites: four**, after the F3 fix — `quality-check.ts:42`,
+  `discussion-generator.ts:63`, `/api/ai/chat` and `/api/ai/generate`.
 
 ## 7. Token accounting and cost
 
@@ -135,7 +135,7 @@ uses `DEFAULT_RATE`.
 | Mechanism | Where | Reality |
 | --- | --- | --- |
 | Retry | `errors.ts:withRetry` | 1 retry from the orchestrator, exponential backoff, retryable errors only |
-| Timeout | `errors.ts:withRetry` | Creates an `AbortController` and passes the signal to the callback — **neither adapter forwards it to its SDK**, so the timeout does not cancel anything (see finding F1) |
+| Timeout | `errors.ts:withRetry` | Signal forwarded to both SDKs, plus a `Promise.race` backstop; rejects with `AITimeoutError` (F1 fixed) |
 | Cross-provider fallback | `router.ts:resolveFallback` | Gemini ⇄ OpenAI after a failed call |
 | Dataset hard block | `integrity-guard.ts:requiresDataset` | `results_generation` / `data_analysis` with no `dataSetId` never reach a model |
 | Rate limit | `security/rate-limit.ts` | Per user, DB-backed |
@@ -167,16 +167,21 @@ the `*_rls_policies.sql` migrations.
 
 Ordered by consequence. Each is a code fact, not an inference.
 
-### F1 — The provider timeout does not time out — *high*
+### F1 — The provider timeout does not time out — *high* — **FIXED**
 `errors.ts:withRetry` aborts a controller on `timeoutMs`, but
 `providers/gemini.ts` and `providers/openai.ts` never accept or forward the
 signal, and there is no `Promise.race`. A hung provider connection blocks the
 orchestrator indefinitely; the orchestrator's `timeoutMs: 45_000` is inert.
-*Fix:* forward `AbortSignal` to both SDKs (both accept one), or race the call.
-The Phase 16 harness implements its own `withTimeout` rather than inheriting
-this.
+*Fixed:* `ProviderGenerateRequest` gains `signal`; Gemini forwards it as
+`config.abortSignal`, OpenAI as the `RequestOptions` second argument; the
+orchestrator passes `withRetry`'s signal through. `withRetry` also races the
+call against the timer, as a backstop for any path that drops the signal, and
+rejects with a new `AITimeoutError`. Regression tests in
+`src/lib/ai/__tests__/timeout-abort.test.ts`. Note Google's caveat: aborting is
+client-side, so an aborted request may still be billed — we stop waiting, not
+paying.
 
-### F2 — Retrieved chunks carry no citable identifier — *high*
+### F2 — Retrieved chunks carry no citable identifier — *high* — **FIXED**
 `document_chunks` has no foreign key to `research_citations` and
 `ChunkSearchResult` (`db/types.ts:226`) has no citation key, so
 `context-manager.ts:formatChunks` labels excerpts `[1]`, `[2]`, …. Every task
@@ -185,12 +190,29 @@ prompt tells the model to cite "its exact `[citation_key]` from context", and
 grounding on retrieved evidence therefore has **no key it can emit that would
 verify** — it can only cite the separate "Relevant Sources" layer, which is
 populated from `sourceIds` the caller passes explicitly, not from retrieval.
-The Phase 16 A/B (variant A vs B) is built to measure exactly this.
+*Fixed:* migration `20260901060000_phase16_chunk_citation_link.sql` adds
+`research_documents.citation_id` (nullable, `on delete set null`) and rebuilds
+`match_document_chunks` to return `citation_key` via a LEFT JOIN through the
+document. `ChunkSearchResult` carries the key; `context-manager.ts` labels each
+excerpt `[citation_key]`, or `[excerpt N (source not linked)]` when the document
+has no source — never an invented key, and the space inside those brackets keeps
+`extractCitationKeys` from scraping the label back out. `PATCH
+/api/research/projects/[projectId]/documents/[documentId]` links or unlinks a
+document, rejecting a citation from another project. Verified against the live
+local Postgres: linked chunks return their key, unlinked return null, the
+function is still `SECURITY INVOKER`, and deleting a source leaves the document
+and its chunks intact.
 
-### F3 — Citation verification does not run on the main chat path — *high*
+### F3 — Citation verification does not run on the main chat path — *high* — **FIXED**
 `verifyCitationsInText` is called from `quality-check.ts` and
 `discussion-generator.ts` only. `/api/ai/chat` (the AI Copilot) and
-`/api/ai/generate` return model output with no citation check.
+`/api/ai/generate` returned model output with no citation check.
+*Fixed:* chat verifies the accumulated answer once the stream completes and
+appends a `[Citation check: ...]` note to the same text stream (`AIChunk` has no
+structured channel, and a key can only be checked once its sentence is
+complete); generate attaches the warnings to `AIResponse.warnings`. Both are
+best-effort — a verification that throws never turns a delivered answer into a
+failure. Tests in `src/app/api/__tests__/ai-citation-verification.test.ts`.
 
 ### F4 — Web grounding and file search are configured but not implemented — *medium*
 `TaskClassification.needsWeb` / `needsDocuments` / `needsData` /
@@ -250,13 +272,26 @@ produces a bogus "citation does not match any saved source" warning.
 
 ## 12. What Phase 16 changed in `src/`
 
-One change, and only because Step 13 requires measuring reasoning tokens:
+**Measurement only** (Step 13 requires reasoning-token accounting; additive and
+optional, no caller behaviour change, `calculateCost()` untouched):
 
-- `src/lib/ai/types.ts` — `TokenUsage` gains optional `reasoningTokens` and
-  `cachedInputTokens`.
-- `src/lib/ai/providers/gemini.ts` — maps `thoughtsTokenCount`,
-  `cachedContentTokenCount`.
-- `src/lib/ai/providers/openai.ts` — maps `output_tokens_details.reasoning_tokens`,
+- `types.ts` — `TokenUsage` gains `reasoningTokens`, `cachedInputTokens`.
+- `providers/gemini.ts` — maps `thoughtsTokenCount`, `cachedContentTokenCount`.
+- `providers/openai.ts` — maps `output_tokens_details.reasoning_tokens`,
   `input_tokens_details.cached_tokens`.
 
-Additive and optional; no caller behaviour changes, `calculateCost()` untouched.
+**Defect fixes** (F1, F2, F3 — see findings above):
+
+- `types.ts` — `ProviderGenerateRequest.signal`; `db/types.ts` —
+  `ChunkSearchResult.citation_key`, `ResearchDocumentRow.citation_id`.
+- `errors.ts` — `AITimeoutError`, signal forwarding, race backstop.
+- `providers/gemini.ts`, `providers/openai.ts` — forward the signal.
+- `orchestrator.ts` — pass the signal through.
+- `context-manager.ts` — label excerpts with their citation key.
+- `api/ai/chat/route.ts`, `api/ai/generate/route.ts` — verify citations.
+- `api/research/projects/[projectId]/documents/[documentId]/route.ts` — `PATCH`
+  to link a document to its source.
+- `supabase/migrations/20260901060000_phase16_chunk_citation_link.sql`.
+
+Still open, and unchanged on purpose: **F6** (streaming token usage), **F7**
+(placeholder rates), F4/F5 (dead config), F9, F10, F11.

@@ -47,23 +47,29 @@ export const OpenAIProvider: AIProvider = {
 
   async generate(request: ProviderGenerateRequest): Promise<AIResponse> {
     try {
-      const response = await getClient().responses.create({
-        model: request.model,
-        instructions: request.systemInstruction,
-        input: request.prompt,
-        max_output_tokens: request.maxOutputTokens,
-        temperature: request.temperature,
-        ...(request.responseSchema && {
-          text: {
-            format: {
-              type: "json_schema",
-              name: "response",
-              schema: request.responseSchema,
-              strict: true,
+      const response = await getClient().responses.create(
+        {
+          model: request.model,
+          instructions: request.systemInstruction,
+          input: request.prompt,
+          max_output_tokens: request.maxOutputTokens,
+          temperature: request.temperature,
+          ...(request.responseSchema && {
+            text: {
+              format: {
+                type: "json_schema",
+                name: "response",
+                schema: request.responseSchema,
+                strict: true,
+              },
             },
-          },
-        }),
-      });
+          }),
+        },
+        // Second argument is RequestOptions; the SDK aborts the underlying
+        // fetch when this fires, which is what makes withRetry's timeout
+        // real (finding F1).
+        { signal: request.signal },
+      );
 
       return {
         content: response.output_text ?? "",
@@ -78,14 +84,17 @@ export const OpenAIProvider: AIProvider = {
 
   async *stream(request: ProviderGenerateRequest): AsyncIterable<AIChunk> {
     try {
-      const stream = await getClient().responses.create({
-        model: request.model,
-        instructions: request.systemInstruction,
-        input: request.prompt,
-        max_output_tokens: request.maxOutputTokens,
-        temperature: request.temperature,
-        stream: true,
-      });
+      const stream = await getClient().responses.create(
+        {
+          model: request.model,
+          instructions: request.systemInstruction,
+          input: request.prompt,
+          max_output_tokens: request.maxOutputTokens,
+          temperature: request.temperature,
+          stream: true,
+        },
+        { signal: request.signal },
+      );
 
       for await (const event of stream) {
         if (event.type === "response.output_text.delta") {

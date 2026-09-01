@@ -7,12 +7,15 @@ import type { Variant } from "../types";
  * The A/B arms for Step 21. Exactly one thing changes between them, so a
  * measured difference is attributable to that thing:
  *
- *   A — production as shipped: `buildSystemInstruction()` verbatim, and
- *       retrieved excerpts rendered the way `context-manager.ts` renders
- *       them (numbered `[1]`, no citation key).
+ *   A — production as shipped: `buildSystemInstruction()` verbatim.
+ *   B — the same instruction plus a short citation-contract addendum.
  *
- *   B — the same system instruction plus a short citation-contract
- *       addendum, with excerpts labelled by citation key.
+ * Both arms now receive citation-keyed excerpts, because that is what
+ * production does since the F2 fix. Before that fix the arms also differed
+ * in context format, which confounded them: a difference could have meant
+ * either "the prompt helped" or "the model finally had something citable".
+ * With F2 fixed by schema change rather than by prompt, the remaining
+ * question is narrow and answerable — does the addendum add anything on top?
  *
  * B is a candidate, not a recommendation. It changes production behaviour
  * only if the benchmark shows it wins; until then it exists solely inside
@@ -33,6 +36,9 @@ export function systemInstructionFor(request: AIRequest, variant: Variant): stri
   return variant === "A" ? base : `${base}\n\n${CITATION_CONTRACT_ADDENDUM}`;
 }
 
-export function contextFormatFor(variant: Variant): ContextFormat {
-  return variant === "A" ? "production" : "keyed";
+export function contextFormatFor(_variant: Variant): ContextFormat {
+  // Both arms use production's real format. The pre-F2 `numbered` renderer
+  // stays available for a deliberate before/after comparison, not as an
+  // A/B arm.
+  return "keyed";
 }

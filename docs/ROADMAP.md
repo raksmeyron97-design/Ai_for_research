@@ -13,7 +13,7 @@
 | 16 (workflow) | Section-aware research workflow, change control, versioning | COMPLETE |
 | 17 | Advanced Evidence & Literature Workspace (model + deterministic review) | COMPLETE |
 | 17B | Researcher-facing evidence & literature workspace | COMPLETE |
-| 18 | Advanced Methodology & Questionnaire Intelligence | NOT STARTED |
+| 18 | Advanced Methodology & Questionnaire Intelligence | COMPLETE |
 
 ## Live AI benchmark: DEFERRED
 
@@ -37,12 +37,20 @@ version history UI (closed in 17), component tests (closed in 17).
 extraction, source comparison, themes, the research gap matrix, and the review
 and version-history panes are now mounted in the editor.
 
-**Phase 17B:** conceptual framework *editor* (validation exists, the editor
-does not) and source search/filter across a large library remain open. The
-responsive layout has no real-browser pass — jsdom does not apply the Tailwind
-breakpoints. Claim offsets drift when the paragraph is edited; comparison is
-capped at five sources; theme suggestion reads bibliographic lines rather than
-full text.
+**Phase 17B:** source search/filter across a large library remains open. Claim
+offsets drift when the paragraph is edited; comparison is capped at five
+sources; theme suggestion reads bibliographic lines rather than full text.
 
 See `docs/PHASE_17B_EVIDENCE_LITERATURE_WORKSPACE.md` §14 for detail, and
 `docs/PHASE_17_EVIDENCE_LITERATURE_WORKSPACE.md` for the underlying model.
+
+**Phase 18:** the conceptual-framework editor is still open — Phase 18 created
+the canonical constructs a framework node should reference, but
+`research_frameworks.graph` still stores free-text labels. Linguistic item
+checks are heuristics, statistical compatibility is advisory, and psychometric
+validity cannot be inferred without data. The responsive layout still has no
+real-browser pass: jsdom does not apply the Tailwind breakpoints, so structure
+is verified and the rendered result at 320/375/414px is not.
+
+See `docs/PHASE_18_METHODOLOGY_QUESTIONNAIRE_INTELLIGENCE.md` §15 for detail,
+and `docs/PHASE_18_METHODOLOGY_AUDIT.md` for the model decisions.

@@ -106,3 +106,31 @@ describe("version history", () => {
     expect(screen.getAllByRole("button", { name: "Compare" })).toHaveLength(1);
   });
 });
+
+/**
+ * Phase 17B §29: the label has to be the action that happened. Reusing "AI
+ * insert" for an evidence insertion would make the history misreport the one
+ * distinction it exists to keep.
+ */
+describe("action labels", () => {
+  it("calls an evidence insertion an evidence insertion, not an AI change", () => {
+    render(
+      <VersionHistory
+        versions={[version({ action: "evidence_insert", provider: null, model: null, section_action: "citation_only" })]}
+        onRestore={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/Evidence insert/)).toBeInTheDocument();
+    expect(screen.queryByText(/AI insert/)).not.toBeInTheDocument();
+  });
+
+  it("marks a restore as a restore", () => {
+    render(
+      <VersionHistory
+        versions={[version({ action: "restore", provider: null, model: null, restored_from_version_id: "v0" })]}
+        onRestore={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/Restored/)).toBeInTheDocument();
+  });
+});

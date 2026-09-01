@@ -1,9 +1,11 @@
 # Phase 17 — Advanced Evidence & Literature Workspace
 
-**Status: PARTIAL.** The evidence data model, the deterministic review logic
-and three of the four Phase 16 UI gaps are complete and verified. The
-researcher-facing *literature* surfaces — evidence cards, source comparison,
-themes, the gap matrix — are not built. See §9.
+**Status: COMPLETE for the model half; the researcher-facing half was
+delivered in Phase 17B.** This phase built the evidence data model, the
+deterministic review logic and three of the four Phase 16 UI gaps. The
+literature surfaces it left unbuilt — evidence cards, source comparison,
+themes, the gap matrix — are listed in §9 and were built in Phase 17B; see
+`docs/PHASE_17B_EVIDENCE_LITERATURE_WORKSPACE.md`.
 
 **Live AI benchmark: DEFERRED.** No paid provider call was made. 770 tests
 (was 739 at phase start), lint, typecheck, build and the offline dry benchmark
@@ -155,10 +157,11 @@ represented. It returns a `checked` list alongside the issues so a clean result
 is not mistaken for scientific endorsement — §20 is explicit that structural
 validity is not correctness.
 
-## 9. What was NOT built
+## 9. What was NOT built in this phase
 
-Stated plainly rather than implied by omission. This is the larger half of the
-phase brief by surface area:
+Stated plainly rather than implied by omission. This was the larger half of the
+phase brief by surface area. **Items 1–4 and 7 were built in Phase 17B**; 5 and
+6 remain open.
 
 1. **Evidence cards and the insertion flow (§8, §13).** The data model, the
    status logic and the relation table all exist, but there is no card UI, no

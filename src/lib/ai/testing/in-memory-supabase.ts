@@ -35,6 +35,7 @@ class QueryBuilder implements PromiseLike<{ data: unknown; error: null }> {
   private orderBy: { column: string; ascending: boolean } | null = null;
   private limitCount: number | null = null;
   private pending: Row[] | null = null;
+  private operation: { kind: "update"; patch: Row } | { kind: "delete" } | null = null;
 
   constructor(
     private readonly store: Record<string, Row[]>,
@@ -114,11 +115,45 @@ class QueryBuilder implements PromiseLike<{ data: unknown; error: null }> {
     return this;
   }
 
+  /**
+   * Deferred, like the real client.
+   *
+   * The obvious implementation runs `matching()` here — but supabase-js builds
+   * the filters *after* `.update()` in the chain (`.update(x).eq("id", id)`),
+   * so evaluating now would match every row in the table and the fake would
+   * silently apply an update far wider than the code under test asked for.
+   * That is not a cosmetic difference: it makes an over-broad write look
+   * correct in tests. So the operation is recorded and applied at execution.
+   */
   update(patch: Row) {
-    const rows = this.matching();
-    for (const row of rows) Object.assign(row, patch, { updated_at: new Date().toISOString() });
-    this.pending = rows;
+    this.operation = { kind: "update", patch };
     return this;
+  }
+
+  /** Deferred for the same reason as `update`. */
+  delete() {
+    this.operation = { kind: "delete" };
+    return this;
+  }
+
+  /** Runs the recorded write, if any, and returns the rows it affected. */
+  private resolve(): Row[] {
+    if (this.pending) return this.pending;
+    if (!this.operation) return this.matching();
+
+    const rows = this.matching();
+    if (this.operation.kind === "update") {
+      const patch = this.operation.patch;
+      for (const row of rows) Object.assign(row, patch, { updated_at: new Date().toISOString() });
+    } else {
+      const doomed = new Set(rows);
+      const table = this.ensure();
+      const kept = table.filter((r) => !doomed.has(r));
+      table.length = 0;
+      table.push(...kept);
+    }
+    this.pending = rows;
+    return rows;
   }
 
   private stamp(row: Row): Row {
@@ -132,12 +167,12 @@ class QueryBuilder implements PromiseLike<{ data: unknown; error: null }> {
   }
 
   async maybeSingle() {
-    const rows = this.pending ?? this.matching();
+    const rows = this.resolve();
     return { data: rows[0] ?? null, error: null };
   }
 
   async single() {
-    const rows = this.pending ?? this.matching();
+    const rows = this.resolve();
     if (rows.length === 0) {
       return { data: null, error: { message: "no rows returned", code: "PGRST116" } };
     }
@@ -148,7 +183,7 @@ class QueryBuilder implements PromiseLike<{ data: unknown; error: null }> {
     onfulfilled?: ((value: { data: unknown; error: null }) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ): PromiseLike<TResult1 | TResult2> {
-    const rows = this.pending ?? this.matching();
+    const rows = this.resolve();
     return Promise.resolve({ data: rows, error: null }).then(onfulfilled, onrejected);
   }
 }
@@ -156,6 +191,7 @@ class QueryBuilder implements PromiseLike<{ data: unknown; error: null }> {
 const UPSERT_KEYS: Record<string, string[]> = {
   research_sections: ["project_id", "section_type"],
   research_citations: ["project_id", "citation_key"],
+  research_source_profiles: ["project_id", "citation_id"],
 };
 
 export function createInMemorySupabase(seed: Record<string, Row[]> = {}): InMemorySupabase {

@@ -1,91 +1,125 @@
 // @vitest-environment jsdom
+import { useState } from "react";
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import WorkspacePanes from "../WorkspacePanes";
+import WorkspacePanes, { type WorkspacePane } from "../WorkspacePanes";
 
-/** Phase 17 §24/§25/§36 — mobile navigation, accessible tabs, no state loss. */
-function setup() {
-  return render(
-    <WorkspacePanes
-      navigator={<div>Navigator content</div>}
-      editor={<textarea aria-label="Section editor" defaultValue="" />}
-      assistant={<div>Assistant content</div>}
-    />,
-  );
+/**
+ * Phase 17 §26 / Phase 17B §30-§31.
+ *
+ * The behaviour worth protecting is not the layout — it is that the panes are
+ * rendered once and stay mounted, because that is what stops a mobile layout
+ * from becoming a second copy of every control and a second copy of the logic
+ * behind it.
+ */
+function panes(): WorkspacePane[] {
+  return [
+    { id: "navigator", label: "Sections", region: "navigator", node: <p>navigator content</p> },
+    {
+      id: "editor",
+      label: "Editor",
+      region: "editor",
+      node: <textarea aria-label="Section text" defaultValue="" />,
+    },
+    // §30's order: Section -> Editor -> Review -> Evidence -> AI.
+    { id: "review", label: "Review", region: "aside", node: <p>review content</p> },
+    { id: "evidence", label: "Evidence", region: "aside", node: <p>evidence content</p> },
+    { id: "assistant", label: "AI Assist", region: "aside", node: <p>assistant content</p> },
+    { id: "history", label: "History", region: "aside", node: <p>history content</p> },
+  ];
 }
 
-describe("responsive workspace panes", () => {
+/**
+ * Aside panes appear in both tab rows — the mobile row and the desktop aside
+ * row — so every query has to say which row it means. That duplication is in
+ * the *tabs*, not the panes: the pane content is still rendered once, which is
+ * what the "no duplicated control" test checks.
+ */
+function mobileTab(name: string) {
+  return within(screen.getByRole("tablist", { name: "Workspace panes" })).getByRole("tab", { name });
+}
+
+function asideTab(name: string) {
+  return within(screen.getByRole("tablist", { name: "Assistant panes" })).getByRole("tab", { name });
+}
+
+/** Mirrors how ProjectWorkspace owns the aside selection. */
+function Harness({ initialAside = "assistant" }: { initialAside?: string }) {
+  const [aside, setAside] = useState(initialAside);
+  return <WorkspacePanes panes={panes()} activeAside={aside} onAsideChange={setAside} />;
+}
+
+describe("workspace panes", () => {
   it("opens on the editor, which is what a researcher came to do", () => {
-    setup();
-    expect(screen.getByRole("tab", { name: "Editor" })).toHaveAttribute("aria-selected", "true");
+    render(<Harness />);
+    expect(mobileTab("Editor")).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("offers every pane in the mobile tab row, including the Phase 17B ones", () => {
+    render(<Harness />);
+    const tabs = screen.getByRole("tablist", { name: "Workspace panes" });
+    const labels = Array.from(tabs.querySelectorAll('[role="tab"]')).map((t) => t.textContent);
+    expect(labels).toEqual(["Sections", "Editor", "Review", "Evidence", "AI Assist", "History"]);
   });
 
   it("switches panes on click", async () => {
-    setup();
-    await userEvent.click(screen.getByRole("tab", { name: "AI Assist" }));
-
-    expect(screen.getByRole("tab", { name: "AI Assist" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tabpanel", { name: "AI Assist" })).toBeVisible();
+    render(<Harness />);
+    await userEvent.click(mobileTab("Evidence"));
+    expect(mobileTab("Evidence")).toHaveAttribute("aria-selected", "true");
+    expect(mobileTab("Editor")).toHaveAttribute("aria-selected", "false");
   });
 
-  it("renders each pane exactly once, so no control is duplicated", () => {
-    setup();
-    // Rendering a separate mobile and desktop layout would duplicate every
-    // interactive control and every id inside the panes.
-    expect(screen.getAllByLabelText("Section editor")).toHaveLength(1);
-    expect(screen.getAllByText("Navigator content")).toHaveLength(1);
+  it("renders each pane exactly once, so no control is duplicated for mobile", () => {
+    render(<Harness />);
+    expect(screen.getAllByText("navigator content")).toHaveLength(1);
+    expect(screen.getAllByLabelText("Section text")).toHaveLength(1);
+    expect(screen.getAllByText("evidence content")).toHaveLength(1);
   });
 
   it("keeps every pane mounted, so switching tabs does not discard work", async () => {
-    setup();
-    const editor = screen.getByLabelText("Section editor");
-    await userEvent.type(editor, "draft in progress");
+    render(<Harness />);
+    const editor = screen.getByLabelText("Section text");
+    await userEvent.type(editor, "a half-written paragraph");
 
-    await userEvent.click(screen.getByRole("tab", { name: "Sections" }));
-    await userEvent.click(screen.getByRole("tab", { name: "Editor" }));
+    await userEvent.click(mobileTab("Review"));
+    await userEvent.click(mobileTab("Editor"));
 
-    // Unmounting inactive panes would have thrown this away, along with any
-    // AI suggestion waiting for review.
-    expect(screen.getByLabelText("Section editor")).toHaveValue("draft in progress");
+    expect(screen.getByLabelText("Section text")).toHaveValue("a half-written paragraph");
   });
 
-  it("moves between tabs with arrow keys", async () => {
-    setup();
-    const editorTab = screen.getByRole("tab", { name: "Editor" });
-    editorTab.focus();
+  it("moves between tabs with arrow keys and wraps at the ends", async () => {
+    render(<Harness />);
+    mobileTab("Editor").focus();
 
     await userEvent.keyboard("{ArrowRight}");
-    expect(screen.getByRole("tab", { name: "AI Assist" })).toHaveAttribute("aria-selected", "true");
+    expect(mobileTab("Review")).toHaveAttribute("aria-selected", "true");
+
+    await userEvent.keyboard("{ArrowLeft}{ArrowLeft}");
+    expect(mobileTab("Sections")).toHaveAttribute("aria-selected", "true");
 
     await userEvent.keyboard("{ArrowLeft}");
-    expect(screen.getByRole("tab", { name: "Editor" })).toHaveAttribute("aria-selected", "true");
+    expect(mobileTab("History")).toHaveAttribute("aria-selected", "true");
   });
 
-  it("wraps around at the ends rather than dead-ending", async () => {
-    setup();
-    screen.getByRole("tab", { name: "Editor" }).focus();
-    await userEvent.keyboard("{ArrowLeft}");
-    expect(screen.getByRole("tab", { name: "Sections" })).toHaveAttribute("aria-selected", "true");
-    await userEvent.keyboard("{ArrowLeft}");
-    expect(screen.getByRole("tab", { name: "AI Assist" })).toHaveAttribute("aria-selected", "true");
+  it("keeps only the active tab in the tab order", () => {
+    render(<Harness />);
+    expect(mobileTab("Editor")).toHaveAttribute("tabindex", "0");
+    expect(mobileTab("Sections")).toHaveAttribute("tabindex", "-1");
   });
 
-  it("keeps only the active tab in the tab order", async () => {
-    setup();
-    expect(screen.getByRole("tab", { name: "Editor" })).toHaveAttribute("tabindex", "0");
-    expect(screen.getByRole("tab", { name: "Sections" })).toHaveAttribute("tabindex", "-1");
-  });
-
-  it("labels the tablist", () => {
-    setup();
+  it("labels both tablists, so a screen reader can tell them apart", () => {
+    render(<Harness />);
     expect(screen.getByRole("tablist", { name: "Workspace panes" })).toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "Assistant panes" })).toBeInTheDocument();
   });
 
-  it("keeps all three panes mounted for the desktop grid", () => {
-    setup();
-    // All three exist in the DOM at all times; CSS decides visibility, so the
-    // desktop three-column workflow is untouched.
-    expect(screen.getAllByRole("tabpanel", { hidden: true })).toHaveLength(3);
+  it("switches the desktop aside column independently of the mobile row", async () => {
+    render(<Harness />);
+    await userEvent.click(asideTab("Review"));
+    expect(asideTab("Review")).toHaveAttribute("aria-selected", "true");
+    // The mobile row is unchanged: a researcher on a phone did not just get
+    // moved off the editor by a desktop-only control.
+    expect(mobileTab("Editor")).toHaveAttribute("aria-selected", "true");
   });
 });

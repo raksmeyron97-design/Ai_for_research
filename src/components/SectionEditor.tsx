@@ -30,6 +30,8 @@ export default function SectionEditor({
   onSaved,
   insertRequest,
   onInsertConsumed,
+  externalUpdate,
+  onFindEvidence,
 }: {
   projectId: string;
   sectionType: SectionType;
@@ -38,6 +40,15 @@ export default function SectionEditor({
   /** Text queued by the AI Copilot's "Insert" button — consumed once, then cleared by the parent. */
   insertRequest?: string | null;
   onInsertConsumed?: () => void;
+  /**
+   * Content the server already saved — an evidence insertion or a restore.
+   * Applied without re-saving: the autosave baseline moves with it, because
+   * echoing a change the server just made back to the server would record a
+   * second, spurious version of the same edit.
+   */
+  externalUpdate?: { content: string; nonce: number } | null;
+  /** Sends the selected paragraph to the Evidence pane (§27). */
+  onFindEvidence?: (passage: string, offset: number) => void;
 }) {
   const [content, setContent] = useState(initialSection?.content ?? "");
   const [status, setStatus] = useState<SectionStatus>(initialSection?.status ?? "not_started");
@@ -54,6 +65,9 @@ export default function SectionEditor({
   const [pending, setPending] = useState<PendingSuggestion | null>(null);
   const [busyAction, setBusyAction] = useState<SectionActionId | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  /** The researcher's current selection in the textarea, for Find evidence. */
+  const [selection, setSelection] = useState<{ text: string; start: number } | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   // Baseline to diff against, not an "is this the first effect run" flag —
   // a boolean ref for that purpose breaks under React Strict Mode's dev-only
   // double-invocation of effects (confirmed against a real Postgres
@@ -82,6 +96,25 @@ export default function SectionEditor({
     // is a fresh function each render and would cause this to loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [insertRequest]);
+
+  // Content the server changed underneath us. The baseline refs move with it
+  // so the autosave effect sees "nothing to save" rather than writing the same
+  // text back and creating a duplicate version entry.
+  useEffect(() => {
+    if (!externalUpdate) return;
+    setContent(externalUpdate.content);
+    initialContentRef.current = externalUpdate.content;
+    setSaveState("saved");
+    setSelection(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalUpdate?.nonce]);
+
+  function captureSelection(el: HTMLTextAreaElement) {
+    const text = el.value.slice(el.selectionStart, el.selectionEnd).trim();
+    // A stray click is a zero-width selection, and a couple of words is not a
+    // paragraph worth extracting claims from.
+    setSelection(text.length >= 20 ? { text, start: el.selectionStart } : null);
+  }
 
   async function runAction(action: SectionAction) {
     setBusyAction(action.id);
@@ -194,6 +227,24 @@ export default function SectionEditor({
         onRun={runAction}
       />
 
+      {onFindEvidence && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={!selection}
+            onClick={() => selection && onFindEvidence(selection.text, selection.start)}
+            className="rounded border border-neutral-300 px-2.5 py-1.5 text-xs disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
+          >
+            Find evidence for selection
+          </button>
+          <span className="text-[11px] text-neutral-500">
+            {selection
+              ? `${selection.text.split(/\s+/).length} words selected`
+              : "Select a paragraph to pull out its claims."}
+          </span>
+        </div>
+      )}
+
       {actionError && (
         <p role="alert" className="rounded border border-red-300 bg-red-50 p-2 text-xs text-red-800">
           {actionError} Your section content was not changed.
@@ -212,8 +263,11 @@ export default function SectionEditor({
       )}
 
       <textarea
+        ref={textareaRef}
         value={content}
         onChange={(e) => setContent(e.target.value)}
+        onSelect={(e) => captureSelection(e.currentTarget)}
+        onBlur={(e) => captureSelection(e.currentTarget)}
         placeholder={`Write ${SECTION_LABELS[sectionType].toLowerCase()} here, or ask the AI Copilot for a draft.`}
         className="min-h-0 flex-1 resize-none rounded border border-neutral-200 p-3 text-sm leading-relaxed focus:border-neutral-400 focus:outline-none"
         id={`section-editor-${sectionType}`}

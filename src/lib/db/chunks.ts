@@ -46,3 +46,32 @@ export async function searchChunks(
   if (error) throw toDbError(error, "searchChunks");
   return (data ?? []) as ChunkSearchResult[];
 }
+
+/**
+ * The first `limit` chunks of the given documents, in document order.
+ *
+ * Used to hand a source's own text to profile extraction without an embedding
+ * call: the question there is "what does this paper say", not "what in this
+ * paper matches a query", so a similarity search would be the wrong tool and a
+ * paid one. `limit` is per call and deliberately small — §36's rule is the
+ * fewest useful excerpts, not the whole document.
+ */
+export async function listChunksForDocuments(
+  supabase: SupabaseClient,
+  projectId: string,
+  documentIds: string[],
+  limit = 4,
+): Promise<{ id: string; document_id: string; content: string; page: number | null; section: string | null }[]> {
+  if (documentIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select("id, document_id, content, page, section")
+    .eq("project_id", projectId)
+    .in("document_id", documentIds)
+    .order("chunk_index", { ascending: true })
+    .limit(limit);
+
+  if (error) throw toDbError(error, "listChunksForDocuments");
+  return (data ?? []) as { id: string; document_id: string; content: string; page: number | null; section: string | null }[];
+}

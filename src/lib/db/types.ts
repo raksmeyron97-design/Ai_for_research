@@ -182,6 +182,138 @@ export interface FrameworkGraph {
   edges: FrameworkEdge[];
 }
 
+// ---------------------------------------------------------------------
+// Literature workspace (Phase 17B)
+// ---------------------------------------------------------------------
+
+/** A researcher-owned grouping of sources. AI may propose one; only the researcher confirms it. */
+export interface ResearchThemeRow {
+  id: string;
+  project_id: string;
+  name: string;
+  description: string | null;
+  ai_suggested: boolean;
+  /** False while an AI suggestion is still awaiting the researcher's confirmation (§22). */
+  confirmed: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResearchThemeInsert {
+  project_id: string;
+  name: string;
+  description?: string | null;
+  ai_suggested?: boolean;
+  confirmed?: boolean;
+}
+
+export interface ResearchThemeSourceRow {
+  id: string;
+  project_id: string;
+  theme_id: string;
+  citation_id: string;
+  ai_suggested: boolean;
+  created_at: string;
+}
+
+/**
+ * Where one field of a source profile came from. Null field text means "not
+ * available in source" and is rendered as exactly that — never filled in.
+ */
+export type FieldProvenance = "source_stated" | "ai_inference" | "user_entered";
+
+export const SOURCE_PROFILE_FIELDS = [
+  "population",
+  "study_design",
+  "sample",
+  "variables",
+  "main_finding",
+  "limitations",
+  "relevance",
+] as const;
+
+export type SourceProfileField = (typeof SOURCE_PROFILE_FIELDS)[number];
+
+export const SOURCE_PROFILE_FIELD_LABELS: Record<SourceProfileField, string> = {
+  population: "Population",
+  study_design: "Study design",
+  sample: "Sample",
+  variables: "Variables",
+  main_finding: "Main finding",
+  limitations: "Limitations",
+  relevance: "Research relevance",
+};
+
+export interface ResearchSourceProfileRow {
+  id: string;
+  project_id: string;
+  citation_id: string;
+  population: string | null;
+  study_design: string | null;
+  sample: string | null;
+  variables: string | null;
+  main_finding: string | null;
+  limitations: string | null;
+  relevance: string | null;
+  field_provenance: Partial<Record<SourceProfileField, FieldProvenance>>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResearchSourceProfileInsert {
+  project_id: string;
+  citation_id: string;
+  population?: string | null;
+  study_design?: string | null;
+  sample?: string | null;
+  variables?: string | null;
+  main_finding?: string | null;
+  limitations?: string | null;
+  relevance?: string | null;
+  field_provenance?: Partial<Record<SourceProfileField, FieldProvenance>>;
+}
+
+/**
+ * How a gap is known. An inference never becomes a stated fact by being
+ * stored — the basis travels with the row and is shown wherever the gap is
+ * (§24).
+ */
+export type GapBasis =
+  | "source_stated"
+  | "derived_limitation"
+  | "ai_inference"
+  | "user_observation"
+  | "needs_verification";
+
+export const GAP_BASIS_LABELS: Record<GapBasis, string> = {
+  source_stated: "Stated by source",
+  derived_limitation: "Derived from a stated limitation",
+  ai_inference: "AI inference",
+  user_observation: "Your observation",
+  needs_verification: "Needs verification",
+};
+
+export interface ResearchGapRow {
+  id: string;
+  project_id: string;
+  citation_id: string | null;
+  gap_text: string;
+  basis: GapBasis;
+  supporting_text: string | null;
+  verified: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResearchGapInsert {
+  project_id: string;
+  citation_id?: string | null;
+  gap_text: string;
+  basis?: GapBasis;
+  supporting_text?: string | null;
+  verified?: boolean;
+}
+
 export interface ResearchFrameworkRow {
   id: string;
   project_id: string;

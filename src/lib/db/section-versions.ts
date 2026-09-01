@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DbError, toDbError } from "./errors";
-import type { SectionType } from "./types";
+import { upsertSection } from "./sections";
+import type { ResearchSectionRow, SectionStatus, SectionType } from "./types";
 
 const TABLE = "research_section_versions";
 
@@ -10,7 +11,9 @@ export type SectionChangeAction =
   | "replace"
   | "append"
   | "ai_generate"
-  | "restore";
+  | "restore"
+  /** A citation the researcher attached to a claim — never an AI rewrite (§29). */
+  | "evidence_insert";
 
 export interface SectionVersionRow {
   id: string;
@@ -74,7 +77,7 @@ export async function listSectionVersions(
 
 /**
  * Restores a section to an earlier version by writing a NEW version whose
- * content came from the old one (§22).
+ * content came from the old one (§7).
  *
  * The obvious implementation — overwrite the section and delete everything
  * after the restore point — is exactly what this must not do. A researcher
@@ -82,6 +85,11 @@ export async function listSectionVersions(
  * back, and the history would silently lose the versions in between. So the
  * intermediate versions stay, and the restore itself becomes another entry
  * pointing at what it came from.
+ *
+ * The section is written *before* the version row, matching the section PUT
+ * route: a version claiming a change that never reached the section is a
+ * history that lies, whereas a change with no history entry is a history that
+ * is merely incomplete. Of the two, the second is recoverable.
  */
 export async function restoreSectionVersion(
   supabase: SupabaseClient,
@@ -91,9 +99,11 @@ export async function restoreSectionVersion(
     sectionType: SectionType;
     versionId: string;
     currentContent: string;
+    status?: SectionStatus;
+    metadata?: Record<string, unknown>;
     userId?: string;
   },
-): Promise<SectionVersionRow> {
+): Promise<{ section: ResearchSectionRow; version: SectionVersionRow }> {
   const { data, error } = await supabase
     .from(TABLE)
     .select("*")
@@ -112,7 +122,15 @@ export async function restoreSectionVersion(
     throw new DbError("restoreSectionVersion: version belongs to a different section", true);
   }
 
-  return recordSectionVersion(supabase, {
+  const section = await upsertSection(supabase, {
+    project_id: params.projectId,
+    section_type: params.sectionType,
+    content: target.new_content,
+    status: params.status,
+    metadata: params.metadata,
+  });
+
+  const version = await recordSectionVersion(supabase, {
     project_id: params.projectId,
     section_id: params.sectionId,
     section_type: params.sectionType,
@@ -122,4 +140,6 @@ export async function restoreSectionVersion(
     restored_from_version_id: target.id,
     created_by: params.userId ?? null,
   });
+
+  return { section, version };
 }

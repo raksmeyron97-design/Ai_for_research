@@ -11,7 +11,8 @@
 | 16A | Pre-benchmark hardening: F11, F10, F9, F7, F4/F5, streaming timeout | COMPLETE |
 | 16B | Live Gemini vs OpenAI benchmark | **DEFERRED** |
 | 16 (workflow) | Section-aware research workflow, change control, versioning | COMPLETE |
-| 17 | Advanced Evidence & Literature Workspace | **PARTIAL** |
+| 17 | Advanced Evidence & Literature Workspace (model + deterministic review) | COMPLETE |
+| 17B | Researcher-facing evidence & literature workspace | COMPLETE |
 | 18 | Advanced Methodology & Questionnaire Intelligence | NOT STARTED |
 
 ## Live AI benchmark: DEFERRED
@@ -32,10 +33,16 @@ To run it: `npm run ai:benchmark:smoke` first (~12 calls, cents), then
 (closed in 17), conceptual framework editor, mobile layout (closed in 17),
 version history UI (closed in 17), component tests (closed in 17).
 
-**Phase 17:** evidence cards and insertion flow, claim extraction, source
-comparison, literature themes, research gap matrix, citation verification UI,
-conceptual framework editor, source search/filter. The review panel and
-version history components exist and are tested but are not yet mounted in the
-editor.
+**Phase 17:** closed by 17B — evidence cards and the insertion flow, claim
+extraction, source comparison, themes, the research gap matrix, and the review
+and version-history panes are now mounted in the editor.
 
-See `docs/PHASE_17_EVIDENCE_LITERATURE_WORKSPACE.md` §9 for detail.
+**Phase 17B:** conceptual framework *editor* (validation exists, the editor
+does not) and source search/filter across a large library remain open. The
+responsive layout has no real-browser pass — jsdom does not apply the Tailwind
+breakpoints. Claim offsets drift when the paragraph is edited; comparison is
+capped at five sources; theme suggestion reads bibliographic lines rather than
+full text.
+
+See `docs/PHASE_17B_EVIDENCE_LITERATURE_WORKSPACE.md` §14 for detail, and
+`docs/PHASE_17_EVIDENCE_LITERATURE_WORKSPACE.md` for the underlying model.

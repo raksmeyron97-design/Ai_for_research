@@ -32,7 +32,7 @@ export interface BenchmarkReport {
 }
 
 function keyFor(summary: ModelSummary): string {
-  return `${summary.provider}:${summary.model}:variant${summary.variant}`;
+  return `${summary.group}:${summary.provider}:${summary.model}:variant${summary.variant}`;
 }
 
 export function buildReport(params: {

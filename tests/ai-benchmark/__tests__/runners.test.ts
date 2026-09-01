@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { computeCost, loadConfig } from "../config";
+import { AB_SCENARIO_IDS, ALL_SCENARIOS } from "../scenarios";
 import { classifyApiError, classifyResult } from "../failure-taxonomy";
 import { RunBudget, mapWithConcurrency, redact } from "../runners/execute";
 import { StubProvider, STUB_MODEL_ID } from "../runners/stub-provider";
@@ -11,6 +12,59 @@ import type { BenchmarkScenario, ExecutionRecord, ScenarioResult } from "../type
 function config(overrides: Partial<BenchmarkConfig> = {}): BenchmarkConfig {
   return { ...loadConfig(), ...overrides };
 }
+
+describe("budget ceilings are sized for the run they gate", () => {
+  const envKeys = ["AI_BENCH_SUITE", "AI_BENCH_MAX_REQUESTS", "AI_BENCH_REPETITIONS"];
+  const saved: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    for (const k of envKeys) {
+      saved[k] = process.env[k];
+      delete process.env[k];
+    }
+  });
+  afterEach(() => {
+    for (const k of envKeys) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  });
+
+  /**
+   * A ceiling below the planned call count truncates the run. That is now
+   * visible (the report says PARTIAL) rather than silent, but a truncated
+   * benchmark is still a wasted paid run, so the default must clear it.
+   *
+   * Since Phase 16B one scenario can cause several provider calls: a retry, a
+   * cross-provider fallback, and the reviewer pass on advanced tasks. The
+   * headroom below is deliberate, not slack.
+   */
+  it("the full-suite default clears the planned call count with headroom", () => {
+    process.env.AI_BENCH_SUITE = "full";
+    const cfg = loadConfig();
+
+    const abExtra = AB_SCENARIO_IDS.length;
+    const groups = 3; // gemini, openai, routed
+    const plannedRuns = (ALL_SCENARIOS.length + abExtra) * cfg.repetitions * groups;
+
+    expect(cfg.maxRequests).toBeGreaterThan(plannedRuns);
+  });
+
+  it("the smoke default clears its own planned calls", () => {
+    const cfg = loadConfig();
+    expect(cfg.suite).toBe("smoke");
+    // 3 smoke scenarios (one of which has an A/B variant) x 3 groups, plus
+    // room for the reviewer pass on the advanced-tier one.
+    expect(cfg.maxRequests).toBeGreaterThanOrEqual(4 * 3);
+  });
+
+  it("the per-scenario backstop exceeds production's own retry-and-fallback budget", () => {
+    // Orchestrator: 45s timeout, one retry, then a fallback attempt at the
+    // same budget. A backstop below that would record normal recovery as a
+    // harness timeout.
+    expect(loadConfig().timeoutMs).toBeGreaterThanOrEqual(180_000);
+  });
+});
 
 describe("run budget", () => {
   it("stops the run at the request ceiling", () => {
@@ -214,7 +268,13 @@ function resultWith(overrides: {
   const execution: ExecutionRecord = {
     timestamp: "t", runId: "r", benchmarkVersion: "16.0.0", scenarioId: "s", category: "rag_grounding",
     provider: "gemini", model: "m", sdkVersion: "1", apiMode: "a", mode: "LIVE", variant: "A",
-    contextFormat: "keyed", repetition: 1, latencyMs: 10, firstTokenMs: null, attempts: 1, retries: 0,
+    contextFormat: "keyed",
+    group: "routed",
+    tier: "standard",
+    blockedByDatasetGuard: false,
+    productionWarnings: [],
+    providerCalls: 1,
+    costConfidence: "verified", repetition: 1, latencyMs: 10, firstTokenMs: null, attempts: 1, retries: 0,
     ok: true, output: "o",
     tokens: { retrievedContextTokens: 0, promptTokens: 0, fromProvider: false },
     cost: { estimatedCostUsd: null, rateSource: "unknown_model" },

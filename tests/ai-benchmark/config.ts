@@ -24,7 +24,13 @@ export interface BenchmarkConfig {
   maxScenarios: number;
   /** Abort the run once estimated spend crosses this. null = no cost ceiling (only request ceiling). */
   maxCostUsd: number | null;
-  /** Per-request wall-clock timeout, enforced by the harness itself. */
+  /**
+   * Harness backstop around a whole scenario. It must exceed the
+   * orchestrator's own budget, not undercut it: production allows one retry
+   * at 45s plus a cross-provider fallback at the same, so a legitimate slow
+   * scenario can run ~180s. A tighter value here would record production's
+   * normal recovery behaviour as a harness timeout.
+   */
   timeoutMs: number;
   retries: number;
   /** smoke = tiny subset for wiring validation; full = whole suite. */
@@ -77,10 +83,15 @@ export function loadConfig(): BenchmarkConfig {
     categoryFilter: list("AI_BENCH_CATEGORIES"),
     repetitions: Math.max(1, num("AI_BENCH_REPETITIONS", suite === "full" ? 3 : 1)),
     concurrency: Math.max(1, num("AI_BENCH_CONCURRENCY", 2)),
-    maxRequests: num("AI_BENCH_MAX_REQUESTS", suite === "full" ? 600 : 12),
+    // Ceilings count PROVIDER CALLS, not scenario runs. Since Phase 16B each
+    // run drives the full production path, so one scenario can cause several
+    // calls: a retry, a cross-provider fallback, and the dual-model reviewer
+    // pass on high-risk advanced tasks. The smoke default leaves room for
+    // that on top of its ~9 runs.
+    maxRequests: num("AI_BENCH_MAX_REQUESTS", suite === "full" ? 1800 : 24),
     maxScenarios: num("AI_BENCH_MAX_SCENARIOS", suite === "full" ? 200 : 3),
     maxCostUsd: process.env.AI_BENCH_MAX_COST_USD ? num("AI_BENCH_MAX_COST_USD", 5) : null,
-    timeoutMs: num("AI_BENCH_TIMEOUT_MS", 90_000),
+    timeoutMs: num("AI_BENCH_TIMEOUT_MS", 240_000),
     retries: Math.max(0, num("AI_BENCH_RETRIES", 1)),
     suite,
     dryRun: bool("AI_BENCH_DRY_RUN", false),

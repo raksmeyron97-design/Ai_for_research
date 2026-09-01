@@ -1,10 +1,13 @@
 import type { BenchmarkScenario } from "../types";
 import { ACADEMIC_QA_SCENARIOS } from "./academic-qa";
 import { HALLUCINATION_SCENARIOS } from "./hallucination";
+import { INTEGRITY_SCENARIOS } from "./integrity";
+import { KHMER_SCENARIOS } from "./khmer";
 import { LANGUAGE_SCENARIOS } from "./language";
 import { METHODOLOGY_SCENARIOS } from "./methodology";
 import { QUESTIONNAIRE_SCENARIOS } from "./questionnaire";
 import { RAG_SCENARIOS } from "./rag";
+import { WRITING_SCENARIOS } from "./writing";
 
 export const ALL_SCENARIOS: BenchmarkScenario[] = [
   ...RAG_SCENARIOS,
@@ -13,6 +16,9 @@ export const ALL_SCENARIOS: BenchmarkScenario[] = [
   ...QUESTIONNAIRE_SCENARIOS,
   ...LANGUAGE_SCENARIOS,
   ...ACADEMIC_QA_SCENARIOS,
+  ...INTEGRITY_SCENARIOS,
+  ...WRITING_SCENARIOS,
+  ...KHMER_SCENARIOS,
 ];
 
 /**

@@ -110,6 +110,18 @@ export interface ScenarioExpectations {
   maxWords?: number;
   /** Terms that must be rendered consistently throughout (terminology drift check). */
   consistentTerms?: string[];
+  /**
+   * The orchestrator's dataset guard must answer this scenario with no
+   * provider call at all (§15 Test A). This is a property of the *pipeline*,
+   * not of the model's wording, so it is checked against the execution record
+   * rather than the response text.
+   */
+  datasetGuardBlocks?: boolean;
+  /**
+   * The production prompt-injection guard must raise a warning for this
+   * scenario's context (§15 Test D).
+   */
+  injectionWarning?: boolean;
 }
 
 export interface BenchmarkScenario {
@@ -130,6 +142,12 @@ export interface BenchmarkScenario {
   /** Subset of corpus source keys treated as retrieved for this scenario. */
   retrievedKeys?: string[];
   expect: ScenarioExpectations;
+  /**
+   * Attached dataset. Left unset on purpose by scenarios that test the
+   * orchestrator's dataset guard: a results/analysis task with no dataset
+   * must never reach a model at all.
+   */
+  dataSetId?: string;
 }
 
 /**
@@ -138,6 +156,19 @@ export interface BenchmarkScenario {
  * measured difference is attributable.
  */
 export type Variant = "A" | "B";
+
+/**
+ * Which routing regime a scenario ran under (Phase 16B §7).
+ *
+ *  - `gemini` / `openai`: the other provider is disabled for the run, so the
+ *    production router resolves every tier onto the named provider. This is a
+ *    real router path, not a bypass — it exercises `resolveProvider`'s
+ *    disabled-provider branch and picks each tier's configured model.
+ *  - `routed`: both providers enabled, so the shipped routing table decides.
+ *    This is the group that answers "does the router send each task to the
+ *    right place", which pinned groups by construction cannot.
+ */
+export type TestGroup = "gemini" | "openai" | "routed";
 
 export interface TokenAccounting {
   inputTokens?: number;
@@ -172,6 +203,17 @@ export interface ExecutionRecord {
   apiMode: string;
   mode: ExecutionMode;
   variant: Variant;
+  group: TestGroup;
+  /** Tier the production classifier assigned. */
+  tier: string;
+  /** True when the response came from the orchestrator's dataset guard with no provider call at all. */
+  blockedByDatasetGuard: boolean;
+  /** Warnings the production pipeline attached (citation, prompt-injection, data integrity). */
+  productionWarnings: { severity: string; category: string; message: string }[];
+  /** Every provider call this scenario caused, including orchestrator-internal fallback and reviewer passes. */
+  providerCalls: number;
+  /** Cost confidence as computed by the production token manager. */
+  costConfidence: string;
   /** Which context rendering was used — see fixtures/context.ts. */
   contextFormat: "keyed" | "numbered" | "none";
   repetition: number;

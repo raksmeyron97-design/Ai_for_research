@@ -1,5 +1,4 @@
 import { execSync } from "node:child_process";
-import type { ProviderName } from "@/lib/ai/types";
 import { applyConcisenessScores, collectFailures, overallStatus, summarize, type ModelSummary } from "./aggregate";
 import { loadConfig, type BenchmarkConfig } from "./config";
 import { scoreExecution } from "./evaluators";
@@ -8,10 +7,19 @@ import { buildScenarioContext } from "./fixtures/context";
 import { buildReport, writeReport } from "./reporters/json-report";
 import { renderMarkdown, writeMarkdown } from "./reporters/markdown-report";
 import { AB_SCENARIO_IDS, selectScenarios } from "./scenarios";
-import { executeScenario, mapWithConcurrency, newRunId, RunBudget } from "./runners/execute";
+import { mapWithConcurrency, newRunId, RunBudget } from "./runners/execute";
+import { applyGroupRouting, executeScenarioViaProduction } from "./runners/execute-production";
 import { configuredModels, preflight } from "./runners/preflight";
-import { STUB_MODEL_ID } from "./runners/stub-provider";
-import type { BenchmarkScenario, ProviderStatus, ScenarioResult, Variant } from "./types";
+import { StubProvider } from "./runners/stub-provider";
+import { installProviderInstrumentation } from "./runners/instrumented-providers";
+import type {
+  BenchmarkScenario,
+  ExecutionRecord,
+  ProviderStatus,
+  ScenarioResult,
+  TestGroup,
+  Variant,
+} from "./types";
 
 function commitSha(): string | null {
   try {
@@ -23,33 +31,41 @@ function commitSha(): string | null {
 
 interface Unit {
   scenario: BenchmarkScenario;
-  provider: ProviderName;
-  model: string;
+  group: TestGroup;
   variant: Variant;
   repetition: number;
 }
 
 /**
- * Expands the run into individual provider calls. Variant B is only run for
- * the designated A/B scenarios (Step 21) — running both arms on all 50
- * scenarios would double the bill to answer a question five scenarios can
- * answer.
+ * Expands one test group into scenario runs. Variant B is only run for the
+ * designated A/B scenarios (Step 21) — running both arms on every scenario
+ * would double the bill to answer a question five scenarios can answer.
  */
-function buildUnits(scenarios: BenchmarkScenario[], config: BenchmarkConfig, models: Record<string, string[]>): Unit[] {
+function buildUnits(scenarios: BenchmarkScenario[], group: TestGroup, config: BenchmarkConfig): Unit[] {
   const units: Unit[] = [];
-  for (const provider of config.providers) {
-    for (const model of models[provider] ?? []) {
-      for (const scenario of scenarios) {
-        const variants: Variant[] = AB_SCENARIO_IDS.includes(scenario.id) ? ["A", "B"] : ["A"];
-        for (const variant of variants) {
-          for (let repetition = 1; repetition <= config.repetitions; repetition += 1) {
-            units.push({ scenario, provider, model, variant, repetition });
-          }
-        }
+  for (const scenario of scenarios) {
+    const variants: Variant[] = AB_SCENARIO_IDS.includes(scenario.id) ? ["A", "B"] : ["A"];
+    for (const variant of variants) {
+      for (let repetition = 1; repetition <= config.repetitions; repetition += 1) {
+        units.push({ scenario, group, variant, repetition });
       }
     }
   }
   return units;
+}
+
+/**
+ * Which routing regimes to run. `routed` is always included when both
+ * providers are enabled: it is the only group that can tell us whether the
+ * shipped routing table sends each task to the right place, which the pinned
+ * groups cannot by construction.
+ */
+function groupsFor(config: BenchmarkConfig): TestGroup[] {
+  const groups: TestGroup[] = [];
+  if (config.providers.includes("gemini")) groups.push("gemini");
+  if (config.providers.includes("openai")) groups.push("openai");
+  if (config.providers.length > 1) groups.push("routed");
+  return groups;
 }
 
 function buildCaveats(config: BenchmarkConfig, statuses: ProviderStatus[], results: ScenarioResult[]): string[] {
@@ -187,17 +203,13 @@ export async function runBenchmark(overrides: Partial<BenchmarkConfig> = {}): Pr
         }))
       : await preflight(config.providers);
 
-    const models: Record<string, string[]> = {};
+    // Model discovery is now advisory rather than a selector: the production
+    // router chooses the model for each task, which is the point of §7. This
+    // still flags a configured model the key does not enumerate.
     for (const provider of config.providers) {
-      if (config.dryRun) {
-        models[provider] = [STUB_MODEL_ID];
-        continue;
-      }
+      if (config.dryRun) continue;
       const status = statuses.find((s) => s.provider === provider);
-      if (status?.status !== "LIVE") {
-        models[provider] = [];
-        continue;
-      }
+      if (status?.status !== "LIVE") continue;
       const requested = config.models[provider] ?? configuredModels(provider);
       // A model missing from models.list is NOT proof the model is
       // unusable: providers serve aliases they do not enumerate. Measured
@@ -208,10 +220,9 @@ export async function runBenchmark(overrides: Partial<BenchmarkConfig> = {}): Pr
       // dropped — silently excluding a working model would produce a
       // report that omits the app's own reasoning tier without saying so.
       const available = status.discoveredModels;
-      models[provider] = requested;
 
       const unlisted = available
-        ? requested.filter((m) => !available.includes(m) && !available.includes(`models/${m}`))
+        ? requested.filter((m: string) => !available.includes(m) && !available.includes(`models/${m}`))
         : [];
       if (unlisted.length) {
         status.reason +=
@@ -227,23 +238,59 @@ export async function runBenchmark(overrides: Partial<BenchmarkConfig> = {}): Pr
       maxScenarios: config.maxScenarios,
     });
 
-    const units = buildUnits(scenarios, config, models);
+    const groups = groupsFor(config);
+    const allUnits = groups.flatMap((group) => buildUnits(scenarios, group, config));
+
     console.log(
-      `[benchmark] run ${runId}: ${scenarios.length} scenarios x ${units.length} planned calls ` +
-        `(suite=${config.suite}, reps=${config.repetitions}, dryRun=${config.dryRun}, maxRequests=${config.maxRequests})`,
+      `[benchmark] run ${runId}: ${scenarios.length} scenarios x ${groups.join("/")} = ` +
+        `${allUnits.length} planned scenario runs (suite=${config.suite}, reps=${config.repetitions}, ` +
+        `dryRun=${config.dryRun}, maxRequests=${config.maxRequests}). ` +
+        `Each run drives the full production path, so it may make more than one provider call.`,
     );
 
-    const executions = await mapWithConcurrency(units, config.concurrency, (unit) =>
-      executeScenario({ ...unit, runId, config, budget }),
-    );
+    // Installed once for the whole run. It counts every provider call for the
+    // budget — including the orchestrator's own retries, fallbacks and
+    // reviewer passes — and, in a dry run, swaps only the network call so
+    // that classification, routing, guards, usage accounting and citation
+    // verification still execute for real.
+    const instrumentation = installProviderInstrumentation({
+      onCall: () => {
+        budget.requestsUsed += 1;
+      },
+      stub: config.dryRun ? StubProvider.generate.bind(StubProvider) : undefined,
+    });
 
+    const executions: ExecutionRecord[] = [];
+    const orderedUnits: Unit[] = [];
+
+    try {
+      // Groups run sequentially: each one sets process-global provider flags,
+      // so overlapping them would race on the same environment.
+      for (const group of groups) {
+        const restoreRouting = applyGroupRouting(group);
+        try {
+          const units = allUnits.filter((u) => u.group === group);
+          const groupExecutions = await mapWithConcurrency(units, config.concurrency, (unit) =>
+            executeScenarioViaProduction({ ...unit, runId, config, budget }),
+          );
+          executions.push(...groupExecutions);
+          orderedUnits.push(...units);
+        } finally {
+          restoreRouting();
+        }
+      }
+    } finally {
+      instrumentation.restore();
+    }
+
+    const units = orderedUnits;
     const results: ScenarioResult[] = executions.map((execution, i) => scoreExecution(units[i].scenario, execution));
     applyConcisenessScores(results);
 
     if (config.judge && !config.dryRun) {
       const liveProviders = statuses.filter((s) => s.status === "LIVE").map((s) => s.provider);
       await mapWithConcurrency(results, config.concurrency, async (result, i) => {
-        const judge = pickJudge(result.execution.provider, liveProviders, (p) => models[p]?.[0]);
+        const judge = pickJudge(result.execution.provider, liveProviders, (p) => configuredModels(p)[0]);
         if (!judge || budget.exhausted) return;
         budget.requestsUsed += 1;
         result.judge = await judgeResponse({
@@ -257,14 +304,17 @@ export async function runBenchmark(overrides: Partial<BenchmarkConfig> = {}): Pr
       });
     }
 
-    const groups = new Map<string, ScenarioResult[]>();
+    // Summarised per (test group x model x variant): a group's identity is
+    // part of the result, since "OpenAI at the standard tier" and "whatever
+    // the router picked" are different measurements.
+    const buckets = new Map<string, ScenarioResult[]>();
     for (const result of results) {
       if (result.execution.mode === "UNAVAILABLE" && !result.execution.ok && result.execution.attempts === 0) continue;
-      const key = `${result.execution.provider}|${result.execution.model}|${result.execution.variant}`;
-      groups.set(key, [...(groups.get(key) ?? []), result]);
+      const key = `${result.execution.group}|${result.execution.provider}|${result.execution.model}|${result.execution.variant}`;
+      buckets.set(key, [...(buckets.get(key) ?? []), result]);
     }
 
-    const summaries = [...groups.values()].map(summarize).sort((a, b) => (b.overall ?? -1) - (a.overall ?? -1));
+    const summaries = [...buckets.values()].map(summarize).sort((a, b) => (b.overall ?? -1) - (a.overall ?? -1));
     const failures = collectFailures(results);
     const status = overallStatus(statuses, summaries);
     const caveats = buildCaveats(config, statuses, results);

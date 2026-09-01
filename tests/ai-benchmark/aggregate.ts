@@ -31,6 +31,7 @@ export interface TokenStats {
 }
 
 export interface ModelSummary {
+  group: string;
   provider: string;
   model: string;
   variant: Variant;
@@ -53,6 +54,12 @@ export interface ModelSummary {
     rateSource: string;
   };
   hallucinationRate: number | null;
+  /** Share of runs the orchestrator's dataset guard answered without any provider call. */
+  datasetGuardBlockRate: number | null;
+  /** Total provider calls, including orchestrator-internal fallback and reviewer passes. */
+  providerCalls: number;
+  /** Share of runs whose cost came from a verified rate. */
+  verifiedCostRate: number | null;
   fabricatedCitationRate: number | null;
   citationPrecision: number | null;
   citationRecall: number | null;
@@ -170,6 +177,7 @@ export function summarize(results: ScenarioResult[]): ModelSummary {
   const ragByClass = summarizeRagClasses(successes);
 
   return {
+    group: first.group,
     provider: first.provider,
     model: first.model,
     variant: first.variant,
@@ -207,6 +215,13 @@ export function summarize(results: ScenarioResult[]): ModelSummary {
     },
     hallucinationRate: hallucinationCandidates.length
       ? hallucinationFailures.length / hallucinationCandidates.length
+      : null,
+    datasetGuardBlockRate: results.length
+      ? results.filter((r) => r.execution.blockedByDatasetGuard).length / results.length
+      : null,
+    providerCalls: results.reduce((sum, r) => sum + r.execution.providerCalls, 0),
+    verifiedCostRate: successes.length
+      ? successes.filter((r) => r.execution.costConfidence === "verified").length / successes.length
       : null,
     fabricatedCitationRate: successes.length ? fabricated.length / successes.length : null,
     citationPrecision: mean(citationScenarios.map((r) => r.citations?.precision ?? null)),

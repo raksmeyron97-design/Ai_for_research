@@ -1,13 +1,13 @@
 # AI Benchmark — latest run
 
 - **Status:** NOT READY
-- **Run:** `run_2026-09-01T10-33-04-710Z_76322c5d` (suite: smoke, benchmark v16.0.0)
-- **Commit:** e9d4079
-- **Timestamp:** 2026-09-01T10:33:19.027Z
+- **Run:** `run_2026-09-01T11-19-35-444Z_a2266530` (suite: smoke, benchmark v16.0.0)
+- **Commit:** a591921
+- **Timestamp:** 2026-09-01T11:19:48.165Z
+- **Completeness:** complete (12 planned calls, none skipped)
 - **Execution modes:** UNAVAILABLE=12
 
 > **Read this before quoting any number below.**
-> - **Cost figures are unavailable.** No verified rate file was supplied (`AI_BENCH_RATE_FILE`), so no USD figure is reported rather than one derived from the placeholder rates in `src/lib/ai/token-manager.ts`.
 > - **1 repetition(s) per scenario.** Latency percentiles from fewer than 3 runs describe this run, not the model.
 > - **Smoke suite only.** A subset of scenarios ran; category coverage is incomplete.
 

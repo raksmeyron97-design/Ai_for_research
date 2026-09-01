@@ -40,8 +40,51 @@ describe("benchmark scenario suite", () => {
     expect([...classes].sort()).toEqual([1, 2, 3, 4]);
   });
 
-  it("includes Khmer-language scenarios", () => {
-    expect(ALL_SCENARIOS.filter((s) => s.language === "km").length).toBeGreaterThanOrEqual(5);
+  // Phase 16B §6: academic Khmer is a core product requirement, so it needs
+  // coverage across the pipeline, not only in "write me a paragraph" tasks.
+  it("covers academic Khmer broadly", () => {
+    const khmer = ALL_SCENARIOS.filter((s) => s.language === "km");
+    expect(khmer.length).toBeGreaterThanOrEqual(15);
+
+    const khmerTasks = new Set(khmer.map((s) => s.task));
+    for (const task of ["problem_statement", "methodology", "discussion", "conclusion", "document_review"]) {
+      expect(khmerTasks.has(task as never), `no Khmer scenario exercises ${task}`).toBe(true);
+    }
+  });
+
+  it("tests Khmer beyond writing — reasoning, RAG and integrity too", () => {
+    const khmerCategories = new Set(
+      ALL_SCENARIOS.filter((s) => s.language === "km").map((s) => s.category),
+    );
+    expect(khmerCategories.has("rag_grounding")).toBe(true);
+    expect(khmerCategories.has("hallucination")).toBe(true);
+  });
+
+  it("exercises every §5 task family", () => {
+    const tasks = new Set(ALL_SCENARIOS.map((s) => s.task));
+    for (const task of [
+      "rewrite", "problem_statement", "rationale", "objective_generation", "research_question",
+      "research_gap", "methodology", "variable_generation", "sampling",
+      "literature_review", "citation", "questionnaire", "document_review",
+      "results_generation", "data_analysis", "discussion", "conclusion", "summarize", "chat",
+    ]) {
+      expect(tasks.has(task as never), `no scenario exercises task type ${task}`).toBe(true);
+    }
+  });
+
+  it("covers the §15 integrity tests, including the two that need the real pipeline", () => {
+    const guarded = ALL_SCENARIOS.filter((s) => s.expect.datasetGuardBlocks);
+    const injected = ALL_SCENARIOS.filter((s) => s.expect.injectionWarning);
+
+    expect(guarded.length, "no scenario exercises the dataset guard (Test A)").toBeGreaterThan(0);
+    expect(injected.length, "no scenario exercises the injection guard (Test D)").toBeGreaterThan(0);
+
+    // Test A only means anything if the task is one the guard actually covers
+    // and no dataset is attached.
+    for (const scenario of guarded) {
+      expect(["results_generation", "data_analysis"]).toContain(scenario.task);
+      expect(scenario.dataSetId).toBeUndefined();
+    }
   });
 
   it("resolves every retrieved key against its corpus", () => {

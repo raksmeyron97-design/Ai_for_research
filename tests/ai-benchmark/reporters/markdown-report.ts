@@ -21,7 +21,8 @@ function usd(value: number | null | undefined): string {
 }
 
 function label(summary: ModelSummary): string {
-  return `${summary.provider} / ${summary.model} (variant ${summary.variant})`;
+  const variant = summary.variant === "A" ? "" : ` var${summary.variant}`;
+  return `[${summary.group}] ${summary.model}${variant}`;
 }
 
 function providerTable(statuses: ProviderStatus[]): string {
@@ -80,11 +81,11 @@ export function renderMarkdown(report: BenchmarkReport, summaries: ModelSummary[
 
   lines.push("## Overall");
   lines.push("");
-  lines.push("| Model | Mode | Scenarios | Overall | Failure rate | Retry rate |");
-  lines.push("| --- | --- | --- | --- | --- | --- |");
+  lines.push("| Group | Provider | Model | Mode | Scenarios | Provider calls | Overall | Failure rate |");
+  lines.push("| --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const s of summaries) {
     lines.push(
-      `| ${label(s)} | ${s.mode} | ${s.scenarios} | ${score(s.overall)} | ${pct(s.failureRate)} | ${pct(s.retryRate)} |`,
+      `| ${s.group} | ${s.provider} | ${s.model} | ${s.mode} | ${s.scenarios} | ${s.providerCalls} | ${score(s.overall)} | ${pct(s.failureRate)} |`,
     );
   }
   lines.push("");
@@ -121,6 +122,7 @@ export function renderMarkdown(report: BenchmarkReport, summaries: ModelSummary[
   lines.push(`| Unsupported claim rate | ${summaries.map((s) => pct(s.unsupportedClaimRate)).join(" | ")} |`);
   lines.push(`| Hallucination rate | ${summaries.map((s) => pct(s.hallucinationRate)).join(" | ")} |`);
   lines.push(`| Abstention accuracy | ${summaries.map((s) => pct(s.abstentionAccuracy)).join(" | ")} |`);
+  lines.push(`| Dataset-guard block rate | ${summaries.map((s) => pct(s.datasetGuardBlockRate)).join(" | ")} |`);
   lines.push("");
 
   const ragClasses = [...new Set(summaries.flatMap((s) => Object.keys(s.ragByClass)))].sort();
@@ -164,6 +166,7 @@ export function renderMarkdown(report: BenchmarkReport, summaries: ModelSummary[
   lines.push(`| Cost per request | ${summaries.map((s) => usd(s.cost.perRequestUsd)).join(" | ")} |`);
   lines.push(`| Cost per successful answer | ${summaries.map((s) => usd(s.cost.perSuccessUsd)).join(" | ")} |`);
   lines.push(`| Rate source | ${summaries.map((s) => s.cost.rateSource).join(" | ")} |`);
+  lines.push(`| Verified-cost share | ${summaries.map((s) => pct(s.verifiedCostRate)).join(" | ")} |`);
   lines.push(`| Quality per 1K tokens | ${summaries.map((s) => score(s.qualityPerKiloToken)).join(" | ")} |`);
   lines.push("");
 

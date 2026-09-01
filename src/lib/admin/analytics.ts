@@ -26,6 +26,7 @@ interface UsageRow {
   latency_ms: number | null;
   success: boolean;
   fallback: boolean;
+  tokens_measured: boolean;
   created_at: string;
 }
 
@@ -81,6 +82,14 @@ export interface AdminAnalyticsSummary {
     totalCostUsd: number;
     successRate: number;
     fallbackRate: number;
+    /**
+     * Share of analyzed calls whose token counts came from the provider
+     * rather than a local estimate. A cost total built from mostly
+     * estimated rows is an order-of-magnitude indication, not a bill, and
+     * the dashboard says so rather than leaving the reader to assume
+     * (finding F6).
+     */
+    measuredTokenRate: number;
   };
   projectsByStatus: Record<string, number>;
   byProvider: ProviderBreakdown[];
@@ -109,7 +118,7 @@ export async function compileAdminAnalytics(admin: SupabaseClient): Promise<Admi
     admin
       .from("ai_usage")
       .select(
-        "id, task_type, provider, model, estimated_cost_usd, input_tokens, output_tokens, latency_ms, success, fallback, created_at",
+        "id, task_type, provider, model, estimated_cost_usd, input_tokens, output_tokens, latency_ms, success, fallback, tokens_measured, created_at",
       )
       .order("created_at", { ascending: false })
       .limit(MAX_USAGE_ROWS),
@@ -140,6 +149,7 @@ export async function compileAdminAnalytics(admin: SupabaseClient): Promise<Admi
   const totalCostUsd = rows.reduce((sum, r) => sum + r.estimated_cost_usd, 0);
   const successCount = rows.filter((r) => r.success).length;
   const fallbackCount = rows.filter((r) => r.fallback).length;
+  const measuredCount = rows.filter((r) => r.tokens_measured).length;
 
   const byProviderMap = new Map<
     string,
@@ -245,6 +255,7 @@ export async function compileAdminAnalytics(admin: SupabaseClient): Promise<Admi
       totalCostUsd,
       successRate: totalCalls > 0 ? successCount / totalCalls : 0,
       fallbackRate: totalCalls > 0 ? fallbackCount / totalCalls : 0,
+      measuredTokenRate: totalCalls > 0 ? measuredCount / totalCalls : 0,
     },
     projectsByStatus,
     byProvider,

@@ -100,7 +100,19 @@ export const OpenAIProvider: AIProvider = {
         if (event.type === "response.output_text.delta") {
           yield { delta: event.delta ?? "", done: false };
         } else if (event.type === "response.completed") {
-          yield { delta: "", done: true };
+          yield { delta: "", done: true, usage: toUsage(event.response.usage) };
+        } else if (event.type === "response.incomplete") {
+          // Truncated (usually max_output_tokens). The tokens produced up to
+          // the cut are still billed, so this must report usage like any
+          // other completion rather than falling through and leaving the
+          // orchestrator to estimate.
+          yield { delta: "", done: true, usage: toUsage(event.response.usage) };
+        } else if (event.type === "response.failed") {
+          // Previously this fell through: the loop ended with no `done`
+          // chunk and the orchestrator recorded the partial text as a
+          // success. Surface it so the failure is recorded as one.
+          const reason = event.response.error?.message ?? "response.failed";
+          throw new AIProviderError("openai", `OpenAI stream failed: ${reason}`, true);
         }
       }
     } catch (err) {

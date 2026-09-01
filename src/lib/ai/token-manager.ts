@@ -13,6 +13,13 @@ export interface UsageRecord {
   latencyMs: number;
   success: boolean;
   fallback: boolean;
+  /**
+   * True when the token counts came from the provider's own usage metadata,
+   * false when they were estimated from text length. Recorded so the admin
+   * dashboard can state what share of its cost total is actually measured
+   * rather than presenting both kinds identically (finding F6).
+   */
+  tokensMeasured: boolean;
   createdAt: string;
 }
 
@@ -68,6 +75,7 @@ export async function recordUsage(supabase: SupabaseClient | undefined, record: 
     latency_ms: record.latencyMs,
     success: record.success,
     fallback: record.fallback,
+    tokens_measured: record.tokensMeasured,
   });
   if (error) {
     console.error(JSON.stringify({ type: "ai_usage_persist_failed", error: error.message, ...record }));
@@ -87,6 +95,12 @@ export function buildUsageRecord(params: {
   success: boolean;
   fallback: boolean;
 }): UsageRecord {
+  // "Measured" means the provider told us, for either direction. A partial
+  // report (input only, say) still beats an estimate, but it is not a full
+  // measurement, so both must be present to claim one.
+  const tokensMeasured =
+    params.usage?.inputTokens !== undefined && params.usage?.outputTokens !== undefined;
+
   const inputTokens =
     params.usage?.inputTokens ?? (params.promptText ? estimateTokens(params.promptText) : 0);
   const outputTokens =
@@ -104,6 +118,7 @@ export function buildUsageRecord(params: {
     latencyMs: params.latencyMs,
     success: params.success,
     fallback: params.fallback,
+    tokensMeasured,
     createdAt: new Date().toISOString(),
   };
 }

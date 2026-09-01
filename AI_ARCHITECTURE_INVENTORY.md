@@ -102,6 +102,7 @@ fallback and a runtime `resolveFallback()` used after a call fails.
 
 | Stage | Where |
 | --- | --- |
+| Identify | `research_documents.citation_id` → `research_citations`; set via `PATCH .../documents/[documentId]`, chosen in `DocumentsPanel` |
 | Extract | `src/lib/documents/extract.ts` (pdf-parse, mammoth) |
 | Chunk | `src/lib/documents/chunk.ts` |
 | Embed | `src/lib/ai/embeddings.ts` — Gemini `embedContent`, `RETRIEVAL_DOCUMENT` / `RETRIEVAL_QUERY` |
@@ -228,7 +229,7 @@ code. An operator disabling `AI_DOCUMENT_RAG` in an incident would change
 nothing while believing RAG was off. Same for `AI_DEFAULT_PROVIDER`: routing is
 by tier table, so setting it to `openai` has no effect.
 
-### F6 — Streamed responses have no provider token counts — *medium*
+### F6 — Streamed responses have no provider token counts — *medium* — **FIXED**
 `providers/gemini.ts:stream` and `providers/openai.ts:stream` yield text deltas
 only and never surface `usageMetadata` / the final `response.completed` usage.
 `orchestrator.stream()` therefore records `estimateTokens(text)` for every
@@ -291,7 +292,18 @@ optional, no caller behaviour change, `calculateCost()` untouched):
 - `api/ai/chat/route.ts`, `api/ai/generate/route.ts` — verify citations.
 - `api/research/projects/[projectId]/documents/[documentId]/route.ts` — `PATCH`
   to link a document to its source.
-- `supabase/migrations/20260901060000_phase16_chunk_citation_link.sql`.
+- `api/research/projects/[projectId]/citations/route.ts` — `GET`/`POST` sources.
+  New: nothing in the app wrote to `research_citations` before, so the picker
+  would have offered an empty list forever.
+- `components/DocumentsPanel.tsx` — per-document source control (pick an
+  existing source, or create one from the file and link in a single step).
+- `providers/gemini.ts`, `providers/openai.ts`, `orchestrator.ts`,
+  `token-manager.ts`, `admin/analytics.ts`, `components/AdminDashboard.tsx` —
+  streaming usage capture and measured/estimated reporting.
+- `supabase/migrations/20260901060000_phase16_chunk_citation_link.sql`,
+  `..._20260901070000_phase16_usage_tokens_measured.sql`.
 
-Still open, and unchanged on purpose: **F6** (streaming token usage), **F7**
-(placeholder rates), F4/F5 (dead config), F9, F10, F11.
+Still open, and unchanged on purpose: **F7** (placeholder rates), F4/F5 (dead
+config), F9, F10, F11. Also unaddressed: `AIOrchestrator.stream()` has no
+timeout at all — the F1 fix covers `generate()` via `withRetry`, but the
+streaming path calls the adapter directly, so a stalled stream still hangs.

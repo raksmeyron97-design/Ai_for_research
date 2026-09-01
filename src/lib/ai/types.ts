@@ -169,6 +169,19 @@ export interface AIResponse {
 export interface AIChunk {
   delta: string;
   done: boolean;
+  /**
+   * Provider-reported usage, whenever the provider reports it — normally on
+   * the final (`done`) chunk, but Gemini also emits a running count
+   * mid-stream, and those are passed through as they arrive so a stream that
+   * dies mid-flight still has a real figure to record rather than a
+   * text-length estimate for a call that was billed.
+   *
+   * Before Phase 16 neither streaming adapter surfaced this at all, so
+   * `AIOrchestrator.stream()` always estimated — and since `/api/ai/chat` is
+   * the streaming route, most `ai_usage` rows and the admin cost dashboard
+   * were built on estimates presented as measurements (finding F6).
+   */
+  usage?: TokenUsage;
 }
 
 export interface TokenCountRequest {

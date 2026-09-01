@@ -13,6 +13,7 @@ interface UsageRowInput {
   latency_ms: number | null;
   success: boolean;
   fallback: boolean;
+  tokens_measured?: boolean;
   created_at: string;
 }
 
@@ -256,5 +257,56 @@ describe("compileAdminAnalytics", () => {
   it("throws AdminAnalyticsError instead of silently reporting zero activity when ai_usage is unreadable", async () => {
     const admin = createAdminMock({ ...baseConfig, usageRows: [], errorOn: "ai_usage" });
     await expect(compileAdminAnalytics(admin)).rejects.toThrow(AdminAnalyticsError);
+  });
+});
+
+
+/**
+ * Phase 16 finding F6. Cost totals were built from a mix of provider-reported
+ * and locally estimated token counts, presented identically. The dashboard
+ * now reports what share is actually measured.
+ */
+describe("measured vs estimated token share", () => {
+  const row = (id: string, tokens_measured: boolean): UsageRowInput => ({
+    id,
+    task_type: "chat",
+    provider: "gemini",
+    model: "gemini-3.6-flash",
+    estimated_cost_usd: 0.01,
+    latency_ms: 100,
+    success: true,
+    fallback: false,
+    tokens_measured,
+    created_at: "2026-08-01T00:00:00Z",
+  });
+
+  function summaryFor(rows: UsageRowInput[]) {
+    return compileAdminAnalytics(
+      createAdminMock({ totalProjects: 1, statusCounts: {}, projectUserIds: ["u1"], usageRows: rows }),
+    );
+  }
+
+  it("reports 1 when every call has provider-reported tokens", async () => {
+    const summary = await summaryFor([row("1", true), row("2", true)]);
+    expect(summary.totals.measuredTokenRate).toBe(1);
+  });
+
+  it("reports the measured fraction for a mixed window", async () => {
+    const summary = await summaryFor([row("1", true), row("2", false), row("3", false), row("4", true)]);
+    expect(summary.totals.measuredTokenRate).toBe(0.5);
+  });
+
+  it("treats a legacy row with no flag as estimated, not measured", async () => {
+    // Rows written before the migration default to false in Postgres; a
+    // missing value must never be optimistically read as measured.
+    const legacy = { ...row("1", false) };
+    delete (legacy as { tokens_measured?: boolean }).tokens_measured;
+    const summary = await summaryFor([legacy]);
+    expect(summary.totals.measuredTokenRate).toBe(0);
+  });
+
+  it("reports 0 rather than NaN when there is no usage at all", async () => {
+    const summary = await summaryFor([]);
+    expect(summary.totals.measuredTokenRate).toBe(0);
   });
 });

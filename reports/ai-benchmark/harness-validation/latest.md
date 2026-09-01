@@ -1,9 +1,9 @@
 # AI Benchmark — latest run
 
 - **Status:** NOT READY
-- **Run:** `run_2026-09-01T10-17-15-773Z_e085ca98` (suite: full, benchmark v16.0.0)
-- **Commit:** f67f3cd
-- **Timestamp:** 2026-09-01T10:17:15.892Z
+- **Run:** `run_2026-09-01T10-33-02-270Z_0340dab9` (suite: full, benchmark v16.0.0)
+- **Commit:** e9d4079
+- **Timestamp:** 2026-09-01T10:33:02.391Z
 - **Execution modes:** MOCKED=366
 
 > **Read this before quoting any number below.**
@@ -104,7 +104,7 @@
 | n | 15 | 15 | 168 | 168 |
 | min | 0 ms | 0 ms | 0 ms | 0 ms |
 | median | 0 ms | 0 ms | 0 ms | 0 ms |
-| p95 | 1 ms | 1 ms | 0 ms | 0 ms |
+| p95 | 1 ms | 1 ms | 1 ms | 1 ms |
 | max | 1 ms | 1 ms | 1 ms | 1 ms |
 
 ## Tokens and cost

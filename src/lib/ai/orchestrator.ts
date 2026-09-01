@@ -7,7 +7,7 @@ import { detectPromptInjection } from "./prompt-injection-guard";
 import { getReviewerProvider, resolveFallback, resolveProvider, type RoutingDecision } from "./router";
 import { classifyTask, needsVerification } from "./task-classifier";
 import { buildUsageRecord, recordUsage } from "./token-manager";
-import type { AIChunk, AIRequest, AIResponse } from "./types";
+import type { AIChunk, AIRequest, AIResponse, TokenUsage } from "./types";
 
 interface OrchestratorOptions {
   userId?: string;
@@ -202,6 +202,9 @@ export class AIOrchestrator {
     const prompt = buildPrompt(request);
     const startedAt = Date.now();
     let outputText = "";
+    // Carried out of the loop so the catch block can still record whatever
+    // the provider reported before it failed mid-stream.
+    let usage: TokenUsage | undefined;
 
     try {
       for await (const chunk of decision.provider.stream({
@@ -211,6 +214,7 @@ export class AIOrchestrator {
         maxOutputTokens: getMaxOutputTokens(),
       })) {
         outputText += chunk.delta;
+        usage = chunk.usage ?? usage;
         yield chunk;
       }
       await recordUsage(
@@ -221,6 +225,7 @@ export class AIOrchestrator {
           taskType: request.taskType,
           provider: decision.providerName,
           model: decision.model,
+          usage,
           promptText: prompt,
           outputText,
           latencyMs: Date.now() - startedAt,
@@ -237,7 +242,9 @@ export class AIOrchestrator {
           taskType: request.taskType,
           provider: decision.providerName,
           model: decision.model,
+          usage,
           promptText: prompt,
+          outputText,
           latencyMs: Date.now() - startedAt,
           success: false,
           fallback: decision.isFallback,

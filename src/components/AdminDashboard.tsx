@@ -84,10 +84,27 @@ export default function AdminDashboard({ initialSummary }: { initialSummary: Adm
         <SummaryCard label="Researchers" value={String(summary.totals.totalResearchers)} />
         <SummaryCard label="Projects" value={String(summary.totals.totalProjects)} />
         <SummaryCard label="AI Calls" value={summary.totals.totalCalls.toLocaleString()} />
-        <SummaryCard label="Total Cost" value={formatUsd(summary.totals.totalCostUsd)} hint="Estimated, not billed" />
+        <SummaryCard
+          label="Total Cost"
+          value={formatUsd(summary.totals.totalCostUsd)}
+          hint={
+            summary.totals.measuredTokenRate >= 0.99
+              ? "Estimated from provider-reported tokens, not billed"
+              : `Estimated, not billed — only ${formatPercent(summary.totals.measuredTokenRate)} of calls have provider-reported tokens`
+          }
+        />
         <SummaryCard label="Success Rate" value={formatPercent(summary.totals.successRate)} />
         <SummaryCard label="Fallback Rate" value={formatPercent(summary.totals.fallbackRate)} />
       </section>
+
+      {summary.totals.totalCalls > 0 && summary.totals.measuredTokenRate < 0.99 && (
+        <p className="rounded border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+          {formatPercent(1 - summary.totals.measuredTokenRate)} of the analyzed calls have token counts estimated
+          from text length rather than reported by the provider, so the cost figures above are indicative rather
+          than exact. Calls logged before the streaming usage fix are all estimated; new streamed calls are
+          measured.
+        </p>
+      )}
 
       <section>
         <h2 className="mb-2 text-sm font-medium">Daily AI usage</h2>

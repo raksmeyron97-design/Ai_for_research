@@ -339,7 +339,7 @@ exist. Both are best-effort: a verification that throws never converts a
 delivered answer into a failure. 9 tests in
 `src/app/api/__tests__/ai-citation-verification.test.ts`.
 
-### F6 — Streamed responses have no provider token counts
+### F6 — Streamed responses have no provider token counts — **FIXED**
 **Severity:** medium · **Reproducible:** yes (static)
 **Observed:** both `stream()` implementations yield text deltas only and never
 surface usage metadata, so `orchestrator.stream()` records
@@ -347,8 +347,21 @@ surface usage metadata, so `orchestrator.stream()` records
 **Consequence:** `/api/ai/chat` is the streaming route, so **most `ai_usage`
 rows — and therefore the admin analytics dashboard — hold estimated, not
 measured, tokens.**
-**Fix:** capture `usageMetadata` from the final Gemini chunk and the OpenAI
-`response.completed` event.
+**Fixed:** `AIChunk` carries optional `usage`. Gemini passes each usage report
+through as it arrives rather than only on the final chunk, so a stream that
+dies mid-flight still records the provider's own last figure instead of an
+estimate for a call that was billed — a gap the regression test caught after
+the first attempt. OpenAI reports usage from both `response.completed` and
+`response.incomplete` (a truncated response is still billed) and now throws on
+`response.failed`, which previously ended the loop silently and was recorded as
+a **success**.
+
+Because the estimate fallback still exists — a provider can omit usage — a new
+`ai_usage.tokens_measured` column records which kind each row is, defaulting to
+`false` for every pre-existing row, since those were all estimates. The admin
+dashboard exposes `measuredTokenRate` and, below 99%, states plainly what share
+of its cost total is estimated rather than presenting both kinds identically.
+Verified end to end against the running local Postgres.
 
 ### F7 — Cost figures are placeholders
 **Severity:** medium
@@ -538,21 +551,24 @@ explicitly whether it justifies a production change.
 
 **Done** (this phase): F1, F2, F3 — see the failure analysis above.
 
+**Done** (this phase): F1, F2, F3, F6, and the documents-panel UI that makes
+F2 reachable by researchers.
+
 **Improve, in priority order:**
 
-1. **F6** — capture usage metadata on both streaming paths. Until this lands,
-   the admin cost dashboard is reporting estimates for its highest-volume route.
-2. **F7** — replace `RATE_TABLE` with verified rates and a `verified_on` date,
-   and bill reasoning tokens (now captured) in `calculateCost()`.
+1. **F7** — replace `RATE_TABLE` with verified rates and a `verified_on` date,
+   and bill reasoning tokens (now captured) in `calculateCost()`. This is now
+   the largest remaining source of error in the cost dashboard: token counts are
+   measured, but the price applied to them is still a placeholder.
+2. **No timeout on the streaming path.** The F1 fix covers `generate()` through
+   `withRetry`; `AIOrchestrator.stream()` calls the adapter directly, so a
+   stalled stream still hangs. It needs its own guard — an idle-gap timeout
+   rather than a total-duration one, since a long answer is legitimate.
 3. **F10** — tolerate a markdown code fence before `JSON.parse`.
 4. **F11** — restrict `extractCitationKeys` to key-shaped tokens. The F2 fix
    removed the common false positive (numbered excerpts), but a `[Note]` in
    prose still matches.
-5. **UI for F2's link.** The schema, retrieval, rendering and API all carry the
-   citation key now, but nothing in the documents panel lets a researcher pick
-   which source an upload is. Until that exists, `citation_id` stays null for
-   real uploads and excerpts render as uncitable — correct behaviour, but the
-   fix is not yet reaching users.
+5. **F4/F5** — wire up or delete the dead flags.
 
 **Remove:** the seven dead feature flags and `AI_DEFAULT_PROVIDER` from
 `.env.example`, plus `GEMINI_ADVANCED_MODEL` / `OPENAI_STANDARD_MODEL`, or wire
@@ -577,14 +593,14 @@ Two independent reasons, either sufficient:
    hallucination rate, Khmer quality, latency or cost is supported by evidence.
    "The architecture is implemented" is exactly the assumption Phase 16 existed
    to replace, and it remains an assumption.
-2. **Measured defects.** Three of the four that affected production have been
-   fixed in this phase — the timeout now actually cancels (F1), retrieval
-   excerpts carry a verifiable citation key (F2), and both AI routes verify
-   citations (F3). **F6 remains**: usage/cost data for the highest-volume route
-   is still estimated rather than measured, so the admin dashboard's cost
-   figures cannot be trusted. F2's fix is also not yet reachable by users —
-   there is no UI to link an upload to a source, so `citation_id` stays null in
-   practice.
+2. **Measured defects.** All four that affected production are now fixed: the
+   timeout actually cancels (F1), retrieval excerpts carry a verifiable
+   citation key and researchers can link them in the documents panel (F2), both
+   AI routes verify citations (F3), and streamed calls record real
+   provider-reported tokens (F6). What remains is **F7** — token counts are now
+   measured but the *price* applied to them is still a placeholder rate table,
+   so the dashboard's dollar figures remain indicative. The streaming path also
+   still has no timeout of its own.
 
 This is not a finding that the AI performs badly. It is a finding that its
 performance is **unknown**, in a system where the cost of a fabricated citation
@@ -637,7 +653,7 @@ still writes a report.
 | Harness validation (MOCKED) | `reports/ai-benchmark/harness-validation/` |
 | Pricing template | `reports/ai-benchmark/pricing.example.json` |
 | Harness tests | `tests/ai-benchmark/__tests__/` — 110 tests |
-| F1/F2/F3 regression tests | `src/lib/ai/__tests__/timeout-abort.test.ts`, `src/lib/ai/__tests__/context-manager.test.ts`, `src/app/api/__tests__/ai-citation-verification.test.ts` |
+| F1/F2/F3/F6 regression tests | `src/lib/ai/__tests__/timeout-abort.test.ts`, `src/lib/ai/__tests__/context-manager.test.ts`, `src/lib/ai/__tests__/stream-usage.test.ts`, `src/app/api/__tests__/ai-citation-verification.test.ts`, `src/app/api/__tests__/citations-route.test.ts`, `src/app/api/__tests__/document-citation-link.test.ts` |
 
 Raw per-execution dumps are written to `reports/ai-benchmark/**/raw/` and
 git-ignored: each full run produces megabytes of response text, and
@@ -650,7 +666,7 @@ contains a credential.
 
 | Command | What it does |
 | --- | --- |
-| `npm test` | Full suite, 469 tests, no network |
+| `npm test` | Full suite, 502 tests, no network |
 | `npm run ai:models` | Live provider preflight + model discovery |
 | `npm run ai:benchmark:smoke` | 3 scenarios — wiring and cost validation |
 | `npm run ai:benchmark:full` | All 56 scenarios, 3 repetitions |

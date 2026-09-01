@@ -71,10 +71,20 @@ export const GeminiProvider: AIProvider = {
         },
       });
 
+      // Gemini reports usage on the final chunk, and sometimes a running
+      // count on earlier ones. Each report is passed straight through rather
+      // than held back until `done`: if the stream dies mid-flight, the
+      // orchestrator still has the provider's own last figure to record
+      // instead of falling back to a text-length estimate for a call that
+      // was really billed.
+      let usage: TokenUsage | undefined;
+
       for await (const chunk of stream) {
-        yield { delta: chunk.text ?? "", done: false };
+        const chunkUsage = toUsage(chunk.usageMetadata);
+        if (chunkUsage) usage = chunkUsage;
+        yield { delta: chunk.text ?? "", done: false, usage: chunkUsage };
       }
-      yield { delta: "", done: true };
+      yield { delta: "", done: true, usage };
     } catch (err) {
       throw new AIProviderError("gemini", `Gemini stream failed: ${(err as Error).message}`, true, err);
     }

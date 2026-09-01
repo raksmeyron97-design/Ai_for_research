@@ -1,0 +1,49 @@
+{
+  "phase": 16,
+  "status": "NOT READY",
+  "benchmark_version": "16.0.0",
+  "run_id": "run_2026-09-01T06-15-06-115Z_55955cfa",
+  "timestamp": "2026-09-01T06:15:06.323Z",
+  "commit": "63f17e7",
+  "suite": "smoke",
+  "execution_modes": {},
+  "providers": {
+    "gemini": {
+      "provider": "gemini",
+      "credentialPresent": false,
+      "sdkVersion": "2.19.0",
+      "apiMode": "google-genai models.generateContent (Gemini Developer API)",
+      "reachable": null,
+      "status": "UNAVAILABLE",
+      "discoveredModels": null,
+      "reason": "GEMINI_API_KEY is not set. No live call was attempted and no result was synthesised."
+    },
+    "openai": {
+      "provider": "openai",
+      "credentialPresent": false,
+      "sdkVersion": "7.8.0",
+      "apiMode": "openai responses.create (Responses API)",
+      "reachable": null,
+      "status": "UNAVAILABLE",
+      "discoveredModels": null,
+      "reason": "OPENAI_API_KEY is not set. No live call was attempted and no result was synthesised."
+    }
+  },
+  "overall_scores": {},
+  "category_scores": {},
+  "latency": {},
+  "tokens": {},
+  "cost": {},
+  "rag": {},
+  "failures": [],
+  "recommendations": [
+    "No live model measurement exists. Set GEMINI_API_KEY and/or OPENAI_API_KEY and re-run `npm run ai:benchmark:full` before making any model-selection decision."
+  ],
+  "caveats": [
+    "**gemini: PROVIDER_UNAVAILABLE.** GEMINI_API_KEY is not set. No live call was attempted and no result was synthesised.",
+    "**openai: PROVIDER_UNAVAILABLE.** OPENAI_API_KEY is not set. No live call was attempted and no result was synthesised.",
+    "**Cost figures are unavailable.** No verified rate file was supplied (`AI_BENCH_RATE_FILE`), so no USD figure is reported rather than one derived from the placeholder rates in `src/lib/ai/token-manager.ts`.",
+    "**1 repetition(s) per scenario.** Latency percentiles from fewer than 3 runs describe this run, not the model.",
+    "**Smoke suite only.** A subset of scenarios ran; category coverage is incomplete."
+  ]
+}

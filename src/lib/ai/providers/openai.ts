@@ -19,14 +19,26 @@ function getClient(): OpenAI {
   return client;
 }
 
-/** Responses API usage uses input_tokens/output_tokens, not Chat Completions' prompt/completion naming. */
+/**
+ * Responses API usage uses input_tokens/output_tokens, not Chat
+ * Completions' prompt/completion naming. Reasoning and cached-input counts
+ * live one level down in *_tokens_details.
+ */
 function toUsage(usage: unknown): TokenUsage | undefined {
   if (!usage || typeof usage !== "object") return undefined;
-  const u = usage as Record<string, number | undefined>;
+  const u = usage as {
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+    input_tokens_details?: { cached_tokens?: number };
+    output_tokens_details?: { reasoning_tokens?: number };
+  };
   return {
     inputTokens: u.input_tokens,
     outputTokens: u.output_tokens,
     totalTokens: u.total_tokens,
+    reasoningTokens: u.output_tokens_details?.reasoning_tokens,
+    cachedInputTokens: u.input_tokens_details?.cached_tokens,
   };
 }
 

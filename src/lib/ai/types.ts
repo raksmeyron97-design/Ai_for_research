@@ -66,6 +66,18 @@ export interface TokenUsage {
   outputTokens?: number;
   totalTokens?: number;
   estimatedCostUsd?: number;
+  /**
+   * Provider-reported "thinking"/reasoning tokens (Gemini
+   * `thoughtsTokenCount`, OpenAI `output_tokens_details.reasoning_tokens`).
+   * Billed as output but not included in `outputTokens`, so for a reasoning
+   * model `inputTokens + outputTokens` does not reconcile with
+   * `totalTokens`. Captured in Phase 16 so token/cost measurement can see
+   * them; `calculateCost()` still bills input+output only, which
+   * under-counts for these models — see PHASE_16_REAL_AI_VALIDATION_REPORT.md.
+   */
+  reasoningTokens?: number;
+  /** Prompt tokens served from the provider's cache; billed at a reduced rate. */
+  cachedInputTokens?: number;
 }
 
 export interface Citation {

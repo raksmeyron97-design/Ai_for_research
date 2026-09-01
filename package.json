@@ -9,7 +9,15 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "ai:models": "vitest run --config vitest.benchmark.config.ts tests/ai-benchmark/models.bench.ts",
+    "ai:benchmark": "vitest run --config vitest.benchmark.config.ts tests/ai-benchmark/cli.bench.ts",
+    "ai:benchmark:smoke": "AI_BENCH_SUITE=smoke npm run ai:benchmark",
+    "ai:benchmark:full": "AI_BENCH_SUITE=full npm run ai:benchmark",
+    "ai:benchmark:gemini": "AI_BENCH_PROVIDERS=gemini AI_BENCH_SUITE=full npm run ai:benchmark",
+    "ai:benchmark:openai": "AI_BENCH_PROVIDERS=openai AI_BENCH_SUITE=full npm run ai:benchmark",
+    "ai:benchmark:compare": "AI_BENCH_PROVIDERS=gemini,openai AI_BENCH_SUITE=full AI_BENCH_JUDGE=true npm run ai:benchmark",
+    "ai:benchmark:dry": "AI_BENCH_DRY_RUN=true AI_BENCH_SUITE=full npm run ai:benchmark"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",

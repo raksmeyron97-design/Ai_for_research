@@ -1,0 +1,9 @@
+{
+  "_comment": "Copy to pricing.json, replace with rates YOU have verified against each provider's own pricing page today, then run: AI_BENCH_RATE_FILE=reports/ai-benchmark/pricing.json npm run ai:benchmark:full. Keys are exact model ids as executed. Values are USD per 1,000,000 tokens. Without this file the benchmark reports NO cost figure at all rather than a made-up one.",
+  "_verified_on": "REPLACE-WITH-DATE",
+  "_verified_by": "REPLACE-WITH-NAME",
+  "example-model-id": {
+    "inputPerMillion": 0.0,
+    "outputPerMillion": 0.0
+  }
+}

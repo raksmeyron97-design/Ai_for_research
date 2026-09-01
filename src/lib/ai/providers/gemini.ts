@@ -17,6 +17,8 @@ function toUsage(usageMetadata: unknown): TokenUsage | undefined {
     inputTokens: meta.promptTokenCount,
     outputTokens: meta.candidatesTokenCount,
     totalTokens: meta.totalTokenCount,
+    reasoningTokens: meta.thoughtsTokenCount,
+    cachedInputTokens: meta.cachedContentTokenCount,
   };
 }
 

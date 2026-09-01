@@ -7,6 +7,7 @@ import DataAnalysisPanel from "@/components/DataAnalysisPanel";
 import DocumentsPanel from "@/components/DocumentsPanel";
 import EvidencePanel, { type EvidenceRequest } from "@/components/EvidencePanel";
 import LiteratureWorkspace, { type LiteratureTab } from "@/components/LiteratureWorkspace";
+import MethodologyWorkspace from "@/components/MethodologyWorkspace";
 import QualityCheckPanel from "@/components/QualityCheckPanel";
 import QuestionnaireBuilder from "@/components/QuestionnaireBuilder";
 import ResearchNavigator from "@/components/ResearchNavigator";
@@ -65,6 +66,7 @@ export default function ProjectWorkspace({
   const [showDocuments, setShowDocuments] = useState(false);
   const [showQualityCheck, setShowQualityCheck] = useState(false);
   const [literature, setLiterature] = useState<{ tab: LiteratureTab; sourceId?: string } | null>(null);
+  const [showMethodology, setShowMethodology] = useState(false);
   const [insertRequest, setInsertRequest] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
 
@@ -248,6 +250,13 @@ export default function ProjectWorkspace({
           </div>
           <button
             type="button"
+            onClick={() => setShowMethodology(true)}
+            className="rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50"
+          >
+            Methodology
+          </button>
+          <button
+            type="button"
             onClick={() => setLiterature({ tab: "sources" })}
             className="rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50"
           >
@@ -283,6 +292,10 @@ export default function ProjectWorkspace({
 
       {showQualityCheck && (
         <QualityCheckPanel projectId={project.id} onClose={() => setShowQualityCheck(false)} />
+      )}
+
+      {showMethodology && (
+        <MethodologyWorkspace projectId={project.id} onClose={() => setShowMethodology(false)} />
       )}
 
       {literature && (

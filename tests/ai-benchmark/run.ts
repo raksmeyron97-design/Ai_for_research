@@ -97,9 +97,21 @@ function buildRecommendations(summaries: ModelSummary[], statuses: ProviderStatu
   const live = summaries.filter((s) => s.mode === "LIVE");
 
   if (live.length === 0) {
-    recs.push(
-      "No live model measurement exists. Set GEMINI_API_KEY and/or OPENAI_API_KEY and re-run `npm run ai:benchmark:full` before making any model-selection decision.",
-    );
+    const credentialed = statuses.filter((s) => s.status === "LIVE");
+    if (credentialed.length === 0) {
+      recs.push(
+        "No live model measurement exists: no provider credential was available. Set GEMINI_API_KEY and/or OPENAI_API_KEY and re-run `npm run ai:benchmark:full` before making any model-selection decision.",
+      );
+    } else {
+      // The credential works — preflight listed models — but every
+      // generation call failed. Telling the operator to "set the API key"
+      // here would send them to fix the one thing that is already correct.
+      recs.push(
+        `No live model measurement exists despite a working credential for ${credentialed
+          .map((s) => s.provider)
+          .join(" and ")}: every generation call failed. See the failure table for the provider error before re-running.`,
+      );
+    }
     return recs;
   }
 
@@ -180,15 +192,24 @@ export async function runBenchmark(overrides: Partial<BenchmarkConfig> = {}): Pr
         continue;
       }
       const requested = config.models[provider] ?? configuredModels(provider);
-      // Only benchmark models the provider actually lists, when we know the list.
+      // A model missing from models.list is NOT proof the model is
+      // unusable: providers serve aliases they do not enumerate. Measured
+      // on 2026-09-01, `gpt-5.6` is absent from the 118 ids this key lists,
+      // yet a Responses call to it is accepted (it reaches the billing
+      // check), while a genuinely bogus id is rejected with 400 "does not
+      // exist" before billing. So an unlisted model is flagged, never
+      // dropped — silently excluding a working model would produce a
+      // report that omits the app's own reasoning tier without saying so.
       const available = status.discoveredModels;
-      models[provider] = available
-        ? requested.filter((m) => available.includes(m) || available.includes(`models/${m}`))
-        : requested;
+      models[provider] = requested;
 
-      const dropped = requested.filter((m) => !models[provider].includes(m));
-      if (dropped.length) {
-        status.reason += ` Configured model(s) not offered by this key and therefore not benchmarked: ${dropped.join(", ")}.`;
+      const unlisted = available
+        ? requested.filter((m) => !available.includes(m) && !available.includes(`models/${m}`))
+        : [];
+      if (unlisted.length) {
+        status.reason +=
+          ` Configured model(s) not enumerated by this key's model list, benchmarked anyway` +
+          ` (an unlisted id may still be a served alias): ${unlisted.join(", ")}.`;
       }
     }
 

@@ -10,13 +10,22 @@ Phase 16 asked one question: *does the AI actually perform well enough for real
 academic and thesis work?*
 
 **That question is not answered by this report, and this report will not pretend
-otherwise.** No live model call was made, because no provider credential exists
-in this environment. `GEMINI_API_KEY` and `OPENAI_API_KEY` are present but empty
-in `.env.local`, and absent from the shell environment. Both provider endpoints
-are reachable from this machine — `https://generativelanguage.googleapis.com`
-returns 403 and `https://api.openai.com/v1/models` returns 401, i.e. "who are
-you", not "cannot connect" — so the block is **credentials only**. The moment a
-key is supplied, the full suite runs with one command.
+otherwise.** Live credentials for both providers were supplied and **both
+authenticate successfully** — Gemini enumerates 52 models, OpenAI 118. But
+**every generation call fails with HTTP 429 for depleted billing credit**:
+
+- Gemini — `{"error":{"code":429,"message":"Your prepayment credits are depleted."}}`
+- OpenAI — `429 You have no credits remaining. Add credits to continue using the API.`
+
+12 of 12 smoke executions failed this way (2 Gemini models + 1 OpenAI model x 3
+scenarios). Zero model outputs were produced, so zero quality dimensions were
+measured. Nothing was synthesised to fill the gap.
+
+This is a meaningfully different blocker from a missing key, and worth stating
+precisely: **model listing is free, generation is billed.** A green preflight
+(`npm run ai:models`) proves the credential is valid and says nothing about
+whether the account can actually generate. Adding credit to either account is
+the only remaining step; the suite then runs with one command.
 
 What Phase 16 *did* produce:
 
@@ -31,16 +40,19 @@ What Phase 16 *did* produce:
 3. **109 tests over the harness itself**, plus a full 366-execution offline run
    proving the pipeline end to end.
 4. **An honest machine-readable result** (`reports/ai-benchmark/latest.json`)
-   recording `PROVIDER_UNAVAILABLE` for both providers, with zero synthesised
-   data.
+   recording both providers `LIVE` with 12/12 executions failed on
+   `RATE_LIMIT`, and zero synthesised data.
+5. **Two harness defects found by running it for real** and fixed — see
+   "Corrections from the live run" below. Neither would have surfaced offline.
 
 | | |
 | --- | --- |
 | Tested | AI provider abstraction, routing, prompts, RAG assembly, citation verification, token accounting, reliability, structured output, production safety |
-| Live | **Nothing.** Both providers `UNAVAILABLE` |
+| Credentials | Both valid and accepted (Gemini 52 models listed, OpenAI 118) |
+| Live | **No successful generation.** 12/12 smoke calls returned 429 (no billing credit) |
 | Mocked | 366 harness-validation executions against a deterministic stub |
-| Unavailable | Gemini (no key), OpenAI (no key) |
-| Providers/models tested | none |
+| Blocker | Billing credit on both accounts — not credentials, not connectivity, not code |
+| Models attempted | `gemini-3.5-flash-lite`, `gemini-3.6-flash`, `gpt-5.6` |
 | Overall result | Architecture measured; **model quality not measured** |
 
 The status is `NOT READY` for the plainest possible reason: a system whose
@@ -65,20 +77,48 @@ the models score.
 
 ### Provider status (measured, `reports/ai-benchmark/providers.json`)
 
-| Provider | Status | Credential | Reachable | Models discovered | Reason |
-| --- | --- | --- | --- | --- | --- |
-| gemini | `UNAVAILABLE` | absent | not attempted | — | `GEMINI_API_KEY` is not set. No live call was attempted and no result was synthesised. |
-| openai | `UNAVAILABLE` | absent | not attempted | — | `OPENAI_API_KEY` is not set. No live call was attempted and no result was synthesised. |
+| Provider | Status | Credential | Models listed | Generation |
+| --- | --- | --- | --- | --- |
+| gemini | `LIVE` | accepted | 52 | **429 — prepayment credits depleted** |
+| openai | `LIVE` | accepted | 118 | **429 — no credits remaining** |
 
 ### On model IDs
 
-`.env.example` names `gemini-3.5-flash-lite`, `gemini-3.6-flash`, `gpt-5.4-mini`
-and `gpt-5.6`. **None of these were verified**, and this report does not treat
-them as real. Model ids typed into an env file are configuration, not evidence.
-`npm run ai:models` asks each provider which models the key can actually call,
-and the runner drops any configured model the provider does not list, recording
-it in the report. Every execution record stores the exact model id executed
-alongside provider, SDK version, API mode and timestamp.
+The app's configured tiers resolve to `gemini-3.5-flash-lite` (simple),
+`gemini-3.6-flash` (standard) and `gpt-5.6` (advanced + reviewer). All three
+were verified against the live account:
+
+- Both Gemini ids appear in the 52 the key enumerates.
+- **`gpt-5.6` does *not* appear in OpenAI's 118 listed ids — but it is valid
+  anyway.** A direct probe settles it: a Responses call to `gpt-5.6` is accepted
+  and reaches the billing check (429), while a deliberately bogus id is
+  rejected first with `400 The requested model 'definitely-not-a-model-xyz'
+  does not exist.` The 400 precedes the 429, so reaching the billing check
+  proves the model resolved.
+
+The lesson is a benchmark-design one and it changed the harness (see
+"Corrections from the live run"): **`models.list` is not an authority on what a
+key can call.** Providers serve aliases they do not enumerate.
+
+Every execution record stores the exact model id executed alongside provider,
+SDK version, API mode and timestamp.
+
+### Corrections from the live run
+
+Running against a real account exposed two harness defects that the 366-execution
+offline run could not have found. Both are fixed and pinned by tests.
+
+1. **The runner silently dropped unlisted models.** It filtered configured
+   models against `models.list` and excluded anything absent — which removed
+   `gpt-5.6`, the app's entire advanced/reviewer tier, from the first smoke run
+   without failing. It now benchmarks the configured model regardless and
+   *flags* that the id was not enumerated. An omission a report does not
+   mention is worse than a failure it does.
+2. **The "no measurement" recommendation assumed the cause.** It read "Set
+   `GEMINI_API_KEY` and/or `OPENAI_API_KEY` and re-run" even when preflight had
+   just proved both keys work — sending the operator to fix the one thing that
+   was already correct. It now distinguishes a missing credential from a working
+   credential that produced no result, and points at the provider error instead.
 
 ---
 
@@ -178,9 +218,24 @@ number that rises when a model gets better at one and worse at the other.
 | Latency | NOT MEASURED | NOT MEASURED | — |
 | Cost efficiency | NOT MEASURED | NOT MEASURED | — |
 
-Every cell reads `NOT MEASURED` because `PROVIDER_UNAVAILABLE` applies to both
-providers. No cell is filled with a placeholder, an estimate, or a value carried
-over from another model.
+Every cell reads `NOT MEASURED`: both credentials are valid, but 12 of 12
+generation calls returned 429 for depleted billing credit, so no model output
+exists to score. No cell is filled with a placeholder, an estimate, or a value
+carried over from another model.
+
+**Live smoke run** (`reports/ai-benchmark/latest.json`, commit `fdba50b`,
+retries disabled to avoid doubling failed calls):
+
+| Model | Scenarios | Succeeded | Failure type |
+| --- | --- | --- | --- |
+| `gemini-3.5-flash-lite` | 3 | 0 | `RATE_LIMIT` (429, credits depleted) |
+| `gemini-3.6-flash` | 3 | 0 | `RATE_LIMIT` (429, credits depleted) |
+| `gpt-5.6` | 3 | 0 | `RATE_LIMIT` (429, no credits remaining) |
+
+One thing this *does* validate, at no cost: the failure path. Provider errors
+were classified correctly as `RATE_LIMIT` rather than the generic
+`API_FAILURE`, budget rails held, retries behaved, and every error string went
+through `redact()` before reaching the report.
 
 ### Harness validation (MOCKED — not a model result)
 
@@ -479,11 +534,12 @@ numeric provenance.
 
 Two independent reasons, either sufficient:
 
-1. **The core question is unanswered.** Zero live model calls were made. No
-   claim about accuracy, grounding, citation quality, hallucination rate, Khmer
-   quality, latency or cost is supported by evidence. "The architecture is
-   implemented" is exactly the assumption Phase 16 existed to replace, and
-   without credentials it remains an assumption.
+1. **The core question is unanswered.** Zero model outputs were produced: both
+   credentials authenticate, but every generation call is refused for lack of
+   billing credit. No claim about accuracy, grounding, citation quality,
+   hallucination rate, Khmer quality, latency or cost is supported by evidence.
+   "The architecture is implemented" is exactly the assumption Phase 16 existed
+   to replace, and it remains an assumption.
 2. **Four measured defects affect production today**, independent of model
    quality: the timeout does not time out (F1); retrieval and citation
    verification are structurally disconnected (F2); the highest-traffic AI route
@@ -498,21 +554,20 @@ single command.
 ### How to finish Phase 16
 
 ```bash
-# 1. Supply credentials (server-side only, never committed)
-echo 'GEMINI_API_KEY=...' >> .env.local
-echo 'OPENAI_API_KEY=...' >> .env.local
+# 1. Add billing credit to the Gemini and/or OpenAI account.
+#    The keys in .env.local are already valid — this is the only blocker.
+#      Gemini: https://ai.studio/  ·  OpenAI: platform.openai.com billing
+#    A green `npm run ai:models` does NOT prove this: listing is free,
+#    generation is billed.
 
-# 2. Confirm the keys work and see what models they actually serve
-npm run ai:models
-
-# 3. Smoke test first — 3 scenarios, ~6 calls, cents (Step 28)
+# 2. Confirm generation actually works — 3 scenarios, ~9 calls, cents (Step 28)
 npm run ai:benchmark:smoke
 
-# 4. Optional but recommended: verified pricing, or cost stays unreported
+# 3. Optional but recommended: verified pricing, or cost stays unreported
 cp reports/ai-benchmark/pricing.example.json reports/ai-benchmark/pricing.json
 #   ...fill in rates verified against each provider's pricing page today...
 
-# 5. Full comparison run: both providers, 3 repetitions, blind LLM judge
+# 4. Full comparison run: both providers, 3 repetitions, blind LLM judge
 AI_BENCH_RATE_FILE=reports/ai-benchmark/pricing.json \
 AI_BENCH_MAX_COST_USD=10 \
 npm run ai:benchmark:compare
@@ -541,7 +596,7 @@ still writes a report.
 | Provider preflight | `reports/ai-benchmark/providers.json` |
 | Harness validation (MOCKED) | `reports/ai-benchmark/harness-validation/` |
 | Pricing template | `reports/ai-benchmark/pricing.example.json` |
-| Harness tests | `tests/ai-benchmark/__tests__/` — 109 tests |
+| Harness tests | `tests/ai-benchmark/__tests__/` — 110 tests |
 
 Raw per-execution dumps are written to `reports/ai-benchmark/**/raw/` and
 git-ignored: each full run produces megabytes of response text, and
@@ -554,7 +609,7 @@ contains a credential.
 
 | Command | What it does |
 | --- | --- |
-| `npm test` | Full suite, 443 tests, no network |
+| `npm test` | Full suite, 445 tests, no network |
 | `npm run ai:models` | Live provider preflight + model discovery |
 | `npm run ai:benchmark:smoke` | 3 scenarios — wiring and cost validation |
 | `npm run ai:benchmark:full` | All 56 scenarios, 3 repetitions |

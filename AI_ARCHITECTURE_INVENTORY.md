@@ -6,6 +6,9 @@ here and the disagreement is called out. Every claim below names the file it
 came from.
 
 **Commit audited:** `63f17e7` · **Date:** 2026-09-01
+**Live verification:** both provider credentials authenticate (Gemini lists 52
+models, OpenAI 118); all generation calls return 429 for depleted billing
+credit, so no model behaviour was observed.
 **SDKs installed:** `@google/genai` 2.19.0, `openai` 7.8.0, `next` 15.5.24,
 `zod` 3.25.76, `vitest` 4.1.11 · **Node:** v24.15.0
 
@@ -61,10 +64,18 @@ Model ids are configuration, never literals in logic (`model-config.ts`).
 
 | Tier | Provider | Env var | Fallback literal |
 | --- | --- | --- | --- |
-| `simple` | gemini | `GEMINI_FAST_MODEL` | `gemini-3.5-flash-lite` |
-| `standard` | gemini | `GEMINI_STANDARD_MODEL` | `gemini-3.6-flash` |
-| `advanced` | openai | `OPENAI_REASONING_MODEL` | `gpt-5.6` |
-| `reviewer` | openai | `OPENAI_REVIEWER_MODEL` | `gpt-5.6` |
+| `simple` | gemini | `GEMINI_FAST_MODEL` | `gemini-3.5-flash-lite` — verified served |
+| `standard` | gemini | `GEMINI_STANDARD_MODEL` | `gemini-3.6-flash` — verified served |
+| `advanced` | openai | `OPENAI_REASONING_MODEL` | `gpt-5.6` — verified served (see note) |
+| `reviewer` | openai | `OPENAI_REVIEWER_MODEL` | `gpt-5.6` — verified served (see note) |
+
+> **Note on `gpt-5.6`.** It is absent from the 118 ids `models.list` returns for
+> this key, yet a Responses call to it is accepted and reaches the billing check
+> (429), whereas a bogus id is rejected first with `400 ... does not exist`.
+> The 400 precedes the 429, so the model resolves. `models.list` is therefore
+> **not** an authority on what a key can call — providers serve unenumerated
+> aliases. Any tooling that filters configured models against that list will
+> silently drop working ones.
 | embeddings | gemini | `GEMINI_EMBEDDING_MODEL` | `gemini-embedding-001` @ 768 dims |
 
 Routing is a static table (`task-classifier.ts` `TASK_META`), 30 task types →

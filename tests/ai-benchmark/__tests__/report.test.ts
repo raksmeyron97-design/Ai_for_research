@@ -194,3 +194,20 @@ describe("report generation", () => {
     expect(renderMarkdown(report, [])).toContain("Nothing about model quality can be concluded");
   });
 });
+
+describe("recommendations when nothing was measured", () => {
+  it("distinguishes a missing credential from a working credential that produced no result", () => {
+    // Guards the wording fix: a LIVE preflight with zero successful
+    // executions must not be reported as "set your API key".
+    const liveButFailed = buildReport({
+      runId: "r", suite: "smoke", commit: null, status: "NOT READY",
+      statuses, summaries: [], results: [], failures: [],
+      recommendations: [
+        "No live model measurement exists despite a working credential for gemini: every generation call failed.",
+      ],
+      caveats: [],
+    });
+    expect(liveButFailed.recommendations[0]).not.toContain("Set GEMINI_API_KEY");
+    expect(liveButFailed.recommendations[0]).toContain("working credential");
+  });
+});

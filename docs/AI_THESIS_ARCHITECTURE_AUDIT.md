@@ -468,6 +468,47 @@ Summary — this is the last phase in the spec's original sequence:
   reloaded dashboard checked against that real data. Non-admin access
   confirmed denied for real (`404` page, `403` API), not just in theory.
 
+## 2k. What exists now (Phase 15 — Production Hardening)
+
+Full detail lives in
+[`PHASE_15_PRODUCTION_READINESS.md`](./PHASE_15_PRODUCTION_READINESS.md),
+including a PASS/WARN/FAIL rating for every category. Summary — this
+phase hardens Phases 0-10, it doesn't add researcher-facing features:
+
+- **Rate limiting** (`lib/security/rate-limit.ts`, new
+  `rate_limit_events` table): per-user limits on every AI-triggering
+  route (60/10min, shared across chat/generate/questionnaire/discussion/
+  conclusion) and both upload routes (20/hour each). Fails open, soft
+  (not atomic) by design — documented trade-offs, not oversights.
+- **Idempotency** (`lib/security/idempotency.ts`, new
+  `idempotency_keys` table): an opt-in `Idempotency-Key` header,
+  fully wired (server + client) for questionnaire generation — the
+  highest-risk case, since it persists a whole new instrument per call —
+  and server-side-available for discussion/conclusion generation.
+- **Prompt injection defense**: a system-instruction rule plus a bounded
+  heuristic detector (`prompt-injection-guard.ts`) flagging
+  instruction-override patterns in retrieved document/citation content.
+- **Two real bugs found only by loading real pages against the real
+  local Supabase stack** (neither caught by typecheck/lint/test/build):
+  (1) a failing vector search or embedding call previously aborted the
+  *entire* AI request instead of degrading to "no retrieved excerpts";
+  (2) `deleteProject()` never removed a project's uploaded files from
+  Storage, only the DB rows — cascade can't reach Storage — leaving
+  permanent, unreachable orphan files. Both fixed and re-verified for
+  real (the second by uploading a real file, deleting the project, and
+  confirming the storage bucket prefix came back empty).
+- **AI output provenance**: `research_sections.metadata` (unused since
+  Phase 2) now records `{ aiAssisted, lastAiInsertAt }` when an AI draft
+  is inserted — coarse, session-level, deliberately not sentence-level
+  attribution.
+- **Observability**: the Phase 10 admin dashboard gained per-provider
+  token totals and a top-5-most-expensive-requests table.
+- **65 new tests** (335 total), including the first route-level tests in
+  this codebase (`src/app/api/__tests__/`) — this project had relied on
+  real-Supabase verification for route behavior through Phase 10; Phase
+  15 adds automated route-level security tests alongside that, per the
+  phase's explicit "Security Testing" requirement.
+
 ## 3. Explicitly out of scope for this pass (N/A / deferred)
 
 These spec sections describe later phases and were **not** built now —
@@ -635,10 +676,22 @@ Following the spec's phase order:
    totals, no historical trend charts beyond the current daily-usage
    strip.
 
+10. ~~Phase 15 — Production Hardening~~ **done**: rate limiting,
+    idempotency, prompt-injection defense, AI output provenance, and two
+    real bugs (vector-search-failure abort, project-deletion storage
+    orphans) found and fixed via real verification (§2k). Full
+    PASS/WARN/FAIL breakdown and a final-gate judgment call live in
+    [`PHASE_15_PRODUCTION_READINESS.md`](./PHASE_15_PRODUCTION_READINESS.md)
+    — no critical security or data-integrity issue is known to remain,
+    but that report is explicit about what's WARN-rated and why, and
+    about the one gap true since Phase 1: no AI feature has ever been
+    exercised against a real Gemini/OpenAI response in this environment.
+
 Every phase in the spec's original sequence (Phases 0 through 10) is now
-implemented. What's left is the loose ends listed under each phase above
-— none of them block using the app end-to-end — plus whatever new work
-the spec's author decides to scope next.
+implemented, plus Phase 15's hardening pass. What's left is the loose
+ends listed under each phase above (none block using the app
+end-to-end) and the readiness report's WARN items, plus whatever new
+work is scoped next.
 
 **A capability that changed mid-project, worth remembering for later
 phases**: a real Docker daemon and the Supabase CLI became available

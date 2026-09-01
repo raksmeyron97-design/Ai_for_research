@@ -114,6 +114,24 @@ export async function deleteDocument(supabase: SupabaseClient, documentId: strin
   if (error) throw toDbError(error, "deleteDocument");
 }
 
+/**
+ * Removes every stored file for a project's documents, without touching
+ * the DB rows — used by `deleteProject()` (Phase 15 §3, secure deletion):
+ * a project delete cascades every child row via FK constraints, but
+ * Postgres cascade cannot reach Supabase Storage, so the actual file
+ * bytes would otherwise survive forever as orphans no RLS policy can
+ * even reach anymore once the owning project row is gone.
+ */
+export async function removeAllDocumentStorage(supabase: SupabaseClient, projectId: string): Promise<void> {
+  const documents = await listDocuments(supabase, projectId);
+  if (documents.length === 0) return;
+
+  const { error } = await supabase.storage.from(BUCKET).remove(documents.map((d) => d.storage_path));
+  if (error) {
+    throw new DbError(`removeAllDocumentStorage: ${error.message}`);
+  }
+}
+
 /** Signed URL for a private document, for previewing/downloading in the UI. */
 export async function getDocumentDownloadUrl(
   supabase: SupabaseClient,

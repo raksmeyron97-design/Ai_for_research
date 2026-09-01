@@ -4,8 +4,10 @@ import { getProject } from "@/lib/db/projects";
 import { requiresDataset } from "@/lib/ai/integrity-guard";
 import { AIOrchestrator } from "@/lib/ai/orchestrator";
 import { resolveRequestContext } from "@/lib/ai/prepare-request";
+import { detectPromptInjection } from "@/lib/ai/prompt-injection-guard";
 import { aiRequestSchema } from "@/lib/ai/request-schema";
 import type { AIRequest } from "@/lib/ai/types";
+import { checkRateLimit, RATE_LIMITS, rateLimitResponseBody } from "@/lib/security/rate-limit";
 import { createClient, requireUserId } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
@@ -27,10 +29,20 @@ export async function POST(req: Request) {
 
   const supabase = await createClient();
 
+  const rateLimit = await checkRateLimit(supabase, userId, RATE_LIMITS.aiRequest);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(rateLimitResponseBody(rateLimit), { status: 429 });
+  }
+
   // Explicit ownership check: RLS would already stop a cross-project read/
   // write, but checking here turns "your data is silently invisible" into
   // a clean 404 instead of a confusing empty AIRequest.context.
-  const project = await getProject(supabase, parsed.data.projectId);
+  let project;
+  try {
+    project = await getProject(supabase, parsed.data.projectId);
+  } catch {
+    return NextResponse.json({ error: "Database temporarily unavailable" }, { status: 503 });
+  }
   if (!project) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }
@@ -68,8 +80,21 @@ export async function POST(req: Request) {
   const encoder = new TextEncoder();
   let assistantContent = "";
 
+  // stream() has no channel for structured warnings the way generate()
+  // does (AIChunk is just a text delta) — a suspicious pattern in the
+  // retrieved context is surfaced as a visible note ahead of the actual
+  // answer instead. See prompt-injection-guard.ts: this never blocks the
+  // response, it's a heads-up for the researcher to double-check the
+  // source document.
+  const injectionWarning = requestWithContext.context
+    ? detectPromptInjection(requestWithContext.context)
+    : null;
+
   const stream = new ReadableStream({
     async start(controller) {
+      if (injectionWarning) {
+        controller.enqueue(encoder.encode(`[Note: ${injectionWarning.message}]\n\n`));
+      }
       try {
         for await (const chunk of orchestrator.stream(requestWithContext)) {
           if (chunk.delta) {

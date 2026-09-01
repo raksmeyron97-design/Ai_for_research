@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { removeAllDocumentStorage } from "./documents";
 import { toDbError } from "./errors";
 import { SECTION_CHAIN } from "./types";
 import type {
@@ -76,7 +77,16 @@ export async function updateProject(
   return data as ResearchProjectRow;
 }
 
+/**
+ * Storage files are removed before the row that cascade-deletes their DB
+ * records (see removeAllDocumentStorage) — the same "storage before row"
+ * ordering deleteDocument() uses, so a storage failure leaves the project
+ * (and its documents' rows) intact rather than deleting the DB records
+ * while orphaning the files.
+ */
 export async function deleteProject(supabase: SupabaseClient, projectId: string): Promise<void> {
+  await removeAllDocumentStorage(supabase, projectId);
+
   const { error } = await supabase.from(TABLE).delete().eq("id", projectId);
   if (error) throw toDbError(error, "deleteProject");
 }

@@ -3,6 +3,7 @@ import { AllProvidersFailedError, AIProviderError, withRetry } from "./errors";
 import { buildNoDatasetResponse, requiresDataset } from "./integrity-guard";
 import { getMaxOutputTokens } from "./model-config";
 import { buildPrompt, buildSystemInstruction } from "./prompt-manager";
+import { detectPromptInjection } from "./prompt-injection-guard";
 import { getReviewerProvider, resolveFallback, resolveProvider, type RoutingDecision } from "./router";
 import { classifyTask, needsVerification } from "./task-classifier";
 import { buildUsageRecord, recordUsage } from "./token-manager";
@@ -137,6 +138,11 @@ export class AIOrchestrator {
 
     if (needsVerification(request, classification)) {
       response = await this.attachVerification(request, response);
+    }
+
+    const injectionWarning = request.context ? detectPromptInjection(request.context) : null;
+    if (injectionWarning) {
+      response = { ...response, warnings: [...(response.warnings ?? []), injectionWarning] };
     }
 
     return response;

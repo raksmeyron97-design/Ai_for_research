@@ -37,6 +37,8 @@ export default function AICopilot({
   const [generatingSpecial, setGeneratingSpecial] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const conversationIdRef = useRef<string | null>(null);
+  /** Reused across a manual retry after a failed attempt, cleared once a generation succeeds — see the route's idempotency handling. */
+  const pendingSpecialKeyRef = useRef<string | null>(null);
 
   const specialGenerator = SPECIAL_GENERATORS[sectionType];
 
@@ -44,13 +46,17 @@ export default function AICopilot({
     if (!specialGenerator || generatingSpecial) return;
     setError(null);
     setGeneratingSpecial(true);
+    const idempotencyKey = pendingSpecialKeyRef.current ?? crypto.randomUUID();
+    pendingSpecialKeyRef.current = idempotencyKey;
     try {
       const res = await fetch(`/api/research/projects/${projectId}/${specialGenerator.endpoint}/generate`, {
         method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "Generation failed");
       setMessages((prev) => [...prev, { role: "assistant", content: body.content, warnings: body.warnings }]);
+      pendingSpecialKeyRef.current = null;
     } catch (err) {
       setError((err as Error).message);
     } finally {

@@ -5,6 +5,7 @@ import { getProject } from "@/lib/db/projects";
 import { getDocument, listDocuments, uploadDocument } from "@/lib/db/documents";
 import type { DocumentType } from "@/lib/db/types";
 import { processDocument } from "@/lib/documents/process";
+import { checkRateLimit, RATE_LIMITS, rateLimitResponseBody } from "@/lib/security/rate-limit";
 import { requireUserId } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -62,6 +63,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ project
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const supabase = await createClient();
+
+  const rateLimit = await checkRateLimit(supabase, userId, RATE_LIMITS.documentUpload);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(rateLimitResponseBody(rateLimit), { status: 429 });
+  }
+
   const project = await requireOwnedProject(supabase, projectId);
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 

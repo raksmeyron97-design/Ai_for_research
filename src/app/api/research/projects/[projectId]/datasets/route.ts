@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createDataset, listDatasets } from "@/lib/db/datasets";
 import { getProject } from "@/lib/db/projects";
 import { DatasetParseError, parseDataset } from "@/lib/data/parse-dataset";
+import { checkRateLimit, RATE_LIMITS, rateLimitResponseBody } from "@/lib/security/rate-limit";
 import { createClient, requireUserId } from "@/lib/supabase/server";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB
@@ -37,6 +38,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ project
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const supabase = await createClient();
+
+  const rateLimit = await checkRateLimit(supabase, userId, RATE_LIMITS.datasetUpload);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(rateLimitResponseBody(rateLimit), { status: 429 });
+  }
+
   const project = await getProject(supabase, projectId);
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 

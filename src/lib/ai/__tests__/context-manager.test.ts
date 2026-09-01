@@ -179,4 +179,28 @@ describe("buildContext", () => {
 
     spy.mockRestore();
   });
+
+  it("degrades to no retrieved excerpts, rather than throwing, when the embedding call fails (Phase 15 — provider/network outage)", async () => {
+    embeddingsMock.embedQuery.mockRejectedValueOnce(new Error("embedding provider unavailable"));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const context = await buildContext(supabase, { projectId: "proj-1", query: "supplement adherence" });
+
+    expect(context).toContain("## Project Profile"); // the rest of the context still assembles
+    expect(context).not.toContain("## Relevant Document Excerpts");
+    expect(dbChunks.searchChunks).not.toHaveBeenCalled();
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("context_retrieval_failed"));
+    spy.mockRestore();
+  });
+
+  it("degrades to no retrieved excerpts, rather than throwing, when vector search itself fails (Phase 15 — pgvector/DB outage)", async () => {
+    dbChunks.searchChunks.mockRejectedValueOnce(new Error("permission denied for function match_document_chunks"));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const context = await buildContext(supabase, { projectId: "proj-1", query: "supplement adherence" });
+
+    expect(context).toContain("## Project Profile");
+    expect(context).not.toContain("## Relevant Document Excerpts");
+    spy.mockRestore();
+  });
 });

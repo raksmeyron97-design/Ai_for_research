@@ -59,13 +59,19 @@ instrument appendix — see
 [`docs/AI_DOCUMENT_EXPORT.md`](./docs/AI_DOCUMENT_EXPORT.md)), and
 Phase 10 (an admin analytics dashboard at `/admin` covering AI usage,
 cost, and project activity across every researcher — see
-[`docs/AI_ADMIN_ANALYTICS.md`](./docs/AI_ADMIN_ANALYTICS.md)) are all
-implemented — every phase in the original spec sequence now exists. The
-auth/dashboard/editor golden path, RLS (and, since Phase 10, the
-service-role grants the admin dashboard needs) across every table, every
-phase's data-integrity constraints, every export format, and the admin
-dashboard's real numbers against real seeded data have all been verified
-against a real local Supabase instance (Docker) and a real running
-server; the AI provider calls themselves have not, since no real
-Gemini/OpenAI keys are available in this build environment. See the
-audit doc for the loose ends still open within each phase.
+[`docs/AI_ADMIN_ANALYTICS.md`](./docs/AI_ADMIN_ANALYTICS.md)) implement
+every phase in the original spec sequence. Phase 15 (production
+security/reliability hardening — rate limiting, idempotency,
+prompt-injection defense, and two real bugs found and fixed by loading
+real pages against a real local Supabase instance — see
+[`docs/PHASE_15_PRODUCTION_READINESS.md`](./docs/PHASE_15_PRODUCTION_READINESS.md)
+for a full PASS/WARN/FAIL breakdown) hardens all of the above without
+adding new researcher-facing features. The auth/dashboard/editor golden
+path, RLS and storage isolation across every table, every phase's
+data-integrity constraints, every export format, rate limiting,
+idempotency, and secure project deletion have all been verified against
+a real local Supabase instance (Docker) and a real running server; the
+AI provider calls themselves have not, since no real Gemini/OpenAI keys
+are available in this build environment — see the readiness report's
+"Final Gate" section for what that means and doesn't mean for
+production use.

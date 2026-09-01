@@ -21,6 +21,8 @@ interface UsageRow {
   provider: string;
   model: string;
   estimated_cost_usd: number;
+  input_tokens: number;
+  output_tokens: number;
   latency_ms: number | null;
   success: boolean;
   fallback: boolean;
@@ -33,6 +35,19 @@ export interface ProviderBreakdown {
   totalCostUsd: number;
   avgLatencyMs: number;
   successRate: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+}
+
+export interface ExpensiveRequest {
+  id: string;
+  taskType: string;
+  provider: string;
+  model: string;
+  costUsd: number;
+  inputTokens: number;
+  outputTokens: number;
+  createdAt: string;
 }
 
 export interface TaskTypeBreakdown {
@@ -72,6 +87,8 @@ export interface AdminAnalyticsSummary {
   byTaskType: TaskTypeBreakdown[];
   dailyUsage: DailyUsage[];
   recentFailures: RecentFailure[];
+  /** The 5 costliest individual calls in the analyzed window — surfaces a runaway single request that per-provider averages would dilute away. */
+  topExpensiveRequests: ExpensiveRequest[];
 }
 
 /** Aggregates across every user's projects/usage — must only ever be called with an admin (service-role) client, after the caller has verified admin access. */
@@ -91,7 +108,9 @@ export async function compileAdminAnalytics(admin: SupabaseClient): Promise<Admi
     admin.from("research_projects").select("user_id"),
     admin
       .from("ai_usage")
-      .select("id, task_type, provider, model, estimated_cost_usd, latency_ms, success, fallback, created_at")
+      .select(
+        "id, task_type, provider, model, estimated_cost_usd, input_tokens, output_tokens, latency_ms, success, fallback, created_at",
+      )
       .order("created_at", { ascending: false })
       .limit(MAX_USAGE_ROWS),
   ]);
@@ -124,7 +143,15 @@ export async function compileAdminAnalytics(admin: SupabaseClient): Promise<Admi
 
   const byProviderMap = new Map<
     string,
-    { calls: number; cost: number; latencySum: number; latencyCount: number; success: number }
+    {
+      calls: number;
+      cost: number;
+      latencySum: number;
+      latencyCount: number;
+      success: number;
+      inputTokens: number;
+      outputTokens: number;
+    }
   >();
   const byTaskTypeMap = new Map<string, { calls: number; cost: number }>();
   const dailyMap = new Map<string, { calls: number; cost: number }>();
@@ -136,6 +163,8 @@ export async function compileAdminAnalytics(admin: SupabaseClient): Promise<Admi
       latencySum: 0,
       latencyCount: 0,
       success: 0,
+      inputTokens: 0,
+      outputTokens: 0,
     };
     p.calls += 1;
     p.cost += row.estimated_cost_usd;
@@ -144,6 +173,8 @@ export async function compileAdminAnalytics(admin: SupabaseClient): Promise<Admi
       p.latencyCount += 1;
     }
     if (row.success) p.success += 1;
+    p.inputTokens += row.input_tokens ?? 0;
+    p.outputTokens += row.output_tokens ?? 0;
     byProviderMap.set(row.provider, p);
 
     const t = byTaskTypeMap.get(row.task_type) ?? { calls: 0, cost: 0 };
@@ -165,6 +196,8 @@ export async function compileAdminAnalytics(admin: SupabaseClient): Promise<Admi
       totalCostUsd: v.cost,
       avgLatencyMs: v.latencyCount > 0 ? v.latencySum / v.latencyCount : 0,
       successRate: v.calls > 0 ? v.success / v.calls : 0,
+      totalInputTokens: v.inputTokens,
+      totalOutputTokens: v.outputTokens,
     }))
     .sort((a, b) => b.calls - a.calls);
 
@@ -188,6 +221,20 @@ export async function compileAdminAnalytics(admin: SupabaseClient): Promise<Admi
       createdAt: r.created_at,
     }));
 
+  const topExpensiveRequests: ExpensiveRequest[] = [...rows]
+    .sort((a, b) => b.estimated_cost_usd - a.estimated_cost_usd)
+    .slice(0, 5)
+    .map((r) => ({
+      id: r.id,
+      taskType: r.task_type,
+      provider: r.provider,
+      model: r.model,
+      costUsd: r.estimated_cost_usd,
+      inputTokens: r.input_tokens ?? 0,
+      outputTokens: r.output_tokens ?? 0,
+      createdAt: r.created_at,
+    }));
+
   return {
     usageRowsAnalyzed: totalCalls,
     usageRowsCapped: totalCalls === MAX_USAGE_ROWS,
@@ -204,5 +251,6 @@ export async function compileAdminAnalytics(admin: SupabaseClient): Promise<Admi
     byTaskType,
     dailyUsage,
     recentFailures,
+    topExpensiveRequests,
   };
 }

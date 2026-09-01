@@ -392,3 +392,26 @@ export interface ResearchDatasetInsert {
   column_schema: ColumnSchema[];
   data: DatasetRow[];
 }
+
+// ---------------------------------------------------------------------
+// rate_limit_events (Phase 15 — API abuse prevention)
+// ---------------------------------------------------------------------
+export interface RateLimitEventRow {
+  id: string;
+  user_id: string;
+  bucket: string;
+  created_at: string;
+}
+
+// ---------------------------------------------------------------------
+// idempotency_keys (Phase 15 — duplicate-write prevention)
+// ---------------------------------------------------------------------
+export interface IdempotencyKeyRow {
+  id: string;
+  user_id: string;
+  route: string;
+  key: string;
+  status_code: number;
+  response_body: unknown;
+  created_at: string;
+}

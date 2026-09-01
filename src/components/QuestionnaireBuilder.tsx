@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   QuestionnaireQuestionRow,
   ResearchInstrumentRow,
@@ -25,6 +25,8 @@ export default function QuestionnaireBuilder({ projectId }: { projectId: string 
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Reused across a manual retry after a failed attempt (see the route's idempotency handling) so a retry can never create a second instrument — cleared only once a generation actually succeeds. */
+  const pendingGenerateKeyRef = useRef<string | null>(null);
 
   async function loadInstruments() {
     setLoading(true);
@@ -47,8 +49,13 @@ export default function QuestionnaireBuilder({ projectId }: { projectId: string 
   async function handleGenerate() {
     setGenerating(true);
     setError(null);
+    const idempotencyKey = pendingGenerateKeyRef.current ?? crypto.randomUUID();
+    pendingGenerateKeyRef.current = idempotencyKey;
     try {
-      const res = await fetch(`/api/research/projects/${projectId}/instruments`, { method: "POST" });
+      const res = await fetch(`/api/research/projects/${projectId}/instruments`, {
+        method: "POST",
+        headers: { "Idempotency-Key": idempotencyKey },
+      });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? "Generation failed");
@@ -56,8 +63,12 @@ export default function QuestionnaireBuilder({ projectId }: { projectId: string 
       const result = await res.json();
       setInstruments((prev) => [result.instrument, ...prev]);
       setSelected(result);
+      pendingGenerateKeyRef.current = null; // succeeded — a future click starts a new logical attempt
     } catch (err) {
       setError((err as Error).message);
+      // Key is intentionally kept: a retry after a failed attempt reuses
+      // it, so the route can recognize a request that actually succeeded
+      // server-side despite the client seeing a failure.
     } finally {
       setGenerating(false);
     }

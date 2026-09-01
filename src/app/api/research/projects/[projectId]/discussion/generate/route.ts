@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { AllProvidersFailedError } from "@/lib/ai/errors";
 import { DiscussionGenerationError, generateDiscussion } from "@/lib/ai/discussion-generator";
 import { getProject } from "@/lib/db/projects";
+import { getCachedIdempotentResponse, getIdempotencyKey, saveIdempotentResponse } from "@/lib/security/idempotency";
+import { checkRateLimit, RATE_LIMITS, rateLimitResponseBody } from "@/lib/security/rate-limit";
 import { createClient, requireUserId } from "@/lib/supabase/server";
+
+const IDEMPOTENCY_ROUTE = "discussion_generate";
 
 export async function POST(req: Request, { params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
@@ -16,11 +20,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ project
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const supabase = await createClient();
+
+  const idempotencyKey = getIdempotencyKey(req);
+  if (idempotencyKey) {
+    const cached = await getCachedIdempotentResponse(supabase, userId, IDEMPOTENCY_ROUTE, idempotencyKey);
+    if (cached) return NextResponse.json(cached.body, { status: cached.status });
+  }
+
+  const rateLimit = await checkRateLimit(supabase, userId, RATE_LIMITS.aiRequest);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(rateLimitResponseBody(rateLimit), { status: 429 });
+  }
+
   const project = await getProject(supabase, projectId);
   if (!project) return NextResponse.json({ error: "Project not found" }, { status: 404 });
 
   try {
     const result = await generateDiscussion(supabase, projectId, { userId });
+    if (idempotencyKey) {
+      await saveIdempotentResponse(supabase, userId, IDEMPOTENCY_ROUTE, idempotencyKey, 200, result);
+    }
     return NextResponse.json(result);
   } catch (err) {
     if (err instanceof DiscussionGenerationError) {

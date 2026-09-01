@@ -49,11 +49,27 @@ export async function buildContext(
 
   let chunks: ChunkSearchResult[] = [];
   if (params.query?.trim()) {
-    const queryEmbedding = await embedQuery(params.query);
-    chunks = await searchChunks(supabase, params.projectId, queryEmbedding, params.topK ?? 8);
-    if (params.documentIds?.length) {
-      const allowed = new Set(params.documentIds);
-      chunks = chunks.filter((c) => allowed.has(c.document_id));
+    // Retrieval is an enhancement, not a hard requirement — the model can
+    // still answer from the project profile/section/citations/conversation
+    // alone. A failing embedding call or a vector-search outage (Phase 15
+    // §5) must degrade to "no retrieved excerpts," not abort the whole
+    // request the way an unhandled throw here would.
+    try {
+      const queryEmbedding = await embedQuery(params.query);
+      chunks = await searchChunks(supabase, params.projectId, queryEmbedding, params.topK ?? 8);
+      if (params.documentIds?.length) {
+        const allowed = new Set(params.documentIds);
+        chunks = chunks.filter((c) => allowed.has(c.document_id));
+      }
+    } catch (err) {
+      console.error(
+        JSON.stringify({
+          type: "context_retrieval_failed",
+          projectId: params.projectId,
+          error: (err as Error).message,
+        }),
+      );
+      chunks = [];
     }
   }
 

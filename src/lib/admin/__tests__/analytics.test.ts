@@ -8,6 +8,8 @@ interface UsageRowInput {
   provider: string;
   model: string;
   estimated_cost_usd: number;
+  input_tokens?: number;
+  output_tokens?: number;
   latency_ms: number | null;
   success: boolean;
   fallback: boolean;
@@ -107,8 +109,47 @@ describe("compileAdminAnalytics", () => {
     const summary = await compileAdminAnalytics(admin);
 
     expect(summary.byProvider).toEqual([
-      { provider: "gemini", calls: 2, totalCostUsd: 0, avgLatencyMs: 200, successRate: 0.5 },
+      {
+        provider: "gemini",
+        calls: 2,
+        totalCostUsd: 0,
+        avgLatencyMs: 200,
+        successRate: 0.5,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+      },
     ]);
+  });
+
+  it("sums input/output tokens per provider — surfaces a token spike (Phase 15 §7 observability)", async () => {
+    const usageRows: UsageRowInput[] = [
+      { id: "1", task_type: "chat", provider: "gemini", model: "m", estimated_cost_usd: 0, input_tokens: 1000, output_tokens: 200, latency_ms: 1, success: true, fallback: false, created_at: "2026-08-01T00:00:00Z" },
+      { id: "2", task_type: "chat", provider: "gemini", model: "m", estimated_cost_usd: 0, input_tokens: 500, output_tokens: 100, latency_ms: 1, success: true, fallback: false, created_at: "2026-08-01T00:00:00Z" },
+    ];
+    const admin = createAdminMock({ ...baseConfig, usageRows });
+    const summary = await compileAdminAnalytics(admin);
+
+    expect(summary.byProvider[0].totalInputTokens).toBe(1500);
+    expect(summary.byProvider[0].totalOutputTokens).toBe(300);
+  });
+
+  it("surfaces the top 5 costliest individual requests, sorted most expensive first", async () => {
+    const usageRows: UsageRowInput[] = Array.from({ length: 8 }, (_, i) => ({
+      id: `req-${i}`,
+      task_type: "chat",
+      provider: "gemini",
+      model: "m",
+      estimated_cost_usd: i, // 0..7
+      latency_ms: 1,
+      success: true,
+      fallback: false,
+      created_at: "2026-08-01T00:00:00Z",
+    }));
+    const admin = createAdminMock({ ...baseConfig, usageRows });
+    const summary = await compileAdminAnalytics(admin);
+
+    expect(summary.topExpensiveRequests).toHaveLength(5);
+    expect(summary.topExpensiveRequests.map((r) => r.id)).toEqual(["req-7", "req-6", "req-5", "req-4", "req-3"]);
   });
 
   it("breaks usage down by task type", async () => {

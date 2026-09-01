@@ -29,6 +29,13 @@ export default function SectionEditor({
 }) {
   const [content, setContent] = useState(initialSection?.content ?? "");
   const [status, setStatus] = useState<SectionStatus>(initialSection?.status ?? "not_started");
+  // Coarse, session-level provenance (Phase 15 §4's trust taxonomy) — "AI
+  // helped write this section at some point," not sentence-level
+  // attribution. Once a user edits around an AI insert there's no honest
+  // way to say which words are whose, so this deliberately doesn't try;
+  // it answers "was AI ever used here," which is the useful, defensible
+  // claim.
+  const [metadata, setMetadata] = useState<Record<string, unknown>>(initialSection?.metadata ?? {});
   const [saveState, setSaveState] = useState<SaveState>("idle");
   // Baseline to diff against, not an "is this the first effect run" flag —
   // a boolean ref for that purpose breaks under React Strict Mode's dev-only
@@ -44,19 +51,20 @@ export default function SectionEditor({
   useEffect(() => {
     if (!insertRequest) return;
     setContent((prev) => (prev ? `${prev}\n\n${insertRequest}` : insertRequest));
+    setMetadata((prev) => ({ ...prev, aiAssisted: true, lastAiInsertAt: new Date().toISOString() }));
     onInsertConsumed?.();
     // insertRequest is intentionally the only dependency: onInsertConsumed
     // is a fresh function each render and would cause this to loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [insertRequest]);
 
-  async function save(nextContent: string, nextStatus: SectionStatus) {
+  async function save(nextContent: string, nextStatus: SectionStatus, nextMetadata: Record<string, unknown>) {
     setSaveState("saving");
     try {
       const res = await fetch(`/api/research/projects/${projectId}/sections/${sectionType}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: nextContent, status: nextStatus }),
+        body: JSON.stringify({ content: nextContent, status: nextStatus, metadata: nextMetadata }),
       });
       if (!res.ok) throw new Error("save failed");
       const { section } = await res.json();
@@ -72,7 +80,7 @@ export default function SectionEditor({
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => save(content, status), 800);
+    debounceRef.current = setTimeout(() => save(content, status, metadata), 800);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };

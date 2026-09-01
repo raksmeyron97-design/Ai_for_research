@@ -5,6 +5,7 @@ import { AIOrchestrator } from "@/lib/ai/orchestrator";
 import { resolveRequestContext } from "@/lib/ai/prepare-request";
 import { aiRequestSchema } from "@/lib/ai/request-schema";
 import { getProject } from "@/lib/db/projects";
+import { checkRateLimit, RATE_LIMITS, rateLimitResponseBody } from "@/lib/security/rate-limit";
 import { createClient, requireUserId } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
@@ -25,7 +26,18 @@ export async function POST(req: Request) {
   }
 
   const supabase = await createClient();
-  const project = await getProject(supabase, parsed.data.projectId);
+
+  const rateLimit = await checkRateLimit(supabase, userId, RATE_LIMITS.aiRequest);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(rateLimitResponseBody(rateLimit), { status: 429 });
+  }
+
+  let project;
+  try {
+    project = await getProject(supabase, parsed.data.projectId);
+  } catch {
+    return NextResponse.json({ error: "Database temporarily unavailable" }, { status: 503 });
+  }
   if (!project) {
     return NextResponse.json({ error: "Project not found" }, { status: 404 });
   }

@@ -116,6 +116,8 @@ export default function AdminDashboard({ initialSummary }: { initialSummary: Adm
               <th className="py-1 pr-4">Cost</th>
               <th className="py-1 pr-4">Avg latency</th>
               <th className="py-1 pr-4">Success rate</th>
+              <th className="py-1 pr-4">Input tokens</th>
+              <th className="py-1 pr-4">Output tokens</th>
             </tr>
           </thead>
           <tbody>
@@ -126,17 +128,53 @@ export default function AdminDashboard({ initialSummary }: { initialSummary: Adm
                 <td className="py-1.5 pr-4">{formatUsd(p.totalCostUsd)}</td>
                 <td className="py-1.5 pr-4">{Math.round(p.avgLatencyMs)}ms</td>
                 <td className="py-1.5 pr-4">{formatPercent(p.successRate)}</td>
+                <td className="py-1.5 pr-4">{p.totalInputTokens.toLocaleString()}</td>
+                <td className="py-1.5 pr-4">{p.totalOutputTokens.toLocaleString()}</td>
               </tr>
             ))}
             {summary.byProvider.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-3 text-neutral-500">
+                <td colSpan={7} className="py-3 text-neutral-500">
                   No AI usage recorded yet.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-sm font-medium">Most expensive individual requests</h2>
+        {summary.topExpensiveRequests.length === 0 ? (
+          <p className="text-sm text-neutral-500">No AI usage recorded yet.</p>
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-neutral-200 text-xs uppercase text-neutral-500">
+                <th className="py-1 pr-4">When</th>
+                <th className="py-1 pr-4">Task</th>
+                <th className="py-1 pr-4">Provider / Model</th>
+                <th className="py-1 pr-4">Cost</th>
+                <th className="py-1 pr-4">Tokens (in / out)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {summary.topExpensiveRequests.map((r) => (
+                <tr key={r.id} className="border-b border-neutral-100">
+                  <td className="py-1.5 pr-4">{new Date(r.createdAt).toLocaleString()}</td>
+                  <td className="py-1.5 pr-4">{r.taskType}</td>
+                  <td className="py-1.5 pr-4">
+                    {r.provider} / {r.model}
+                  </td>
+                  <td className="py-1.5 pr-4">{formatUsd(r.costUsd)}</td>
+                  <td className="py-1.5 pr-4">
+                    {r.inputTokens.toLocaleString()} / {r.outputTokens.toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </section>
 
       <section>

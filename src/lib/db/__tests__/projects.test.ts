@@ -72,11 +72,57 @@ describe("listProjects / updateProject / deleteProject", () => {
     expect(updateCall?.args[0]).toEqual({ status: "completed" });
   });
 
-  it("deleteProject throws DbError on failure", async () => {
+  it("deleteProject throws DbError when the row delete fails", async () => {
     const { client } = createSupabaseMock({
-      tableResults: { research_projects: { data: null, error: { message: "denied" } } },
+      tableResults: {
+        research_projects: { data: null, error: { message: "denied" } },
+        research_documents: { data: [], error: null },
+      },
     });
     await expect(deleteProject(client, "p1")).rejects.toThrow(DbError);
+  });
+
+  it("deleteProject removes every stored document file before deleting the row (Phase 15 — secure deletion)", async () => {
+    const { client, storageRemove } = createSupabaseMock({
+      tableResults: {
+        research_projects: { data: null, error: null },
+        research_documents: {
+          data: [
+            { id: "d1", storage_path: "p1/a.pdf" },
+            { id: "d2", storage_path: "p1/b.pdf" },
+          ],
+          error: null,
+        },
+      },
+    });
+    await deleteProject(client, "p1");
+    expect(storageRemove).toHaveBeenCalledWith(["p1/a.pdf", "p1/b.pdf"]);
+  });
+
+  it("deleteProject does not touch storage when the project has no documents", async () => {
+    const { client, storageRemove } = createSupabaseMock({
+      tableResults: {
+        research_projects: { data: null, error: null },
+        research_documents: { data: [], error: null },
+      },
+    });
+    await deleteProject(client, "p1");
+    expect(storageRemove).not.toHaveBeenCalled();
+  });
+
+  it("deleteProject leaves the project row intact when removing its stored documents fails", async () => {
+    const { client, fromCalls } = createSupabaseMock({
+      tableResults: {
+        research_projects: { data: null, error: null },
+        research_documents: { data: [{ id: "d1", storage_path: "p1/a.pdf" }], error: null },
+      },
+      storage: { remove: { message: "storage backend unavailable" } },
+    });
+    await expect(deleteProject(client, "p1")).rejects.toThrow(DbError);
+    const projectDeleteCall = fromCalls
+      .find((c) => c.table === "research_projects")
+      ?.builder.calls.find((c) => c.method === "delete");
+    expect(projectDeleteCall).toBeUndefined();
   });
 });
 

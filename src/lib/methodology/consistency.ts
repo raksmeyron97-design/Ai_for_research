@@ -34,7 +34,12 @@ function det(f: Omit<MethodologyFinding, "provenance">): MethodologyFinding {
  * it produces asks the researcher whether the two are the same rather than
  * merging anything.
  */
-function normalisedName(name: string): string {
+/**
+ * Exported for Phase 19's manuscript-consistency checks, which reuse this
+ * exact heuristic for claim-text-vs-construct-name drift rather than
+ * inventing a second one.
+ */
+export function normalisedName(name: string): string {
   return contentWords(name)
     .map((word) => (word.length > 3 && word.endsWith("s") ? word.slice(0, -1) : word))
     .sort()

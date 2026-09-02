@@ -20,7 +20,8 @@
     "ai:benchmark:dry": "AI_BENCH_DRY_RUN=true AI_BENCH_SUITE=full npm run ai:benchmark",
     "db:verify:isolation": "docker exec -i supabase_db_AI_for_research psql -U postgres -d postgres < supabase/tests/phase17_project_isolation.sql",
     "db:verify:isolation:17b": "docker exec -i supabase_db_AI_for_research psql -U postgres -d postgres < supabase/tests/phase17b_project_isolation.sql",
-    "db:verify:isolation:18": "docker exec -i supabase_db_AI_for_research psql -U postgres -d postgres < supabase/tests/phase18_project_isolation.sql"
+    "db:verify:isolation:18": "docker exec -i supabase_db_AI_for_research psql -U postgres -d postgres < supabase/tests/phase18_project_isolation.sql",
+    "db:verify:isolation:19": "docker exec -i supabase_db_AI_for_research psql -U postgres -d postgres < supabase/tests/phase19_project_isolation.sql"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",

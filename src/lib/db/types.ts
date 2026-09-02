@@ -1126,3 +1126,120 @@ export interface ResearchIntegrityEventInsert {
   previous_value?: Record<string, unknown> | null;
   new_value?: Record<string, unknown> | null;
 }
+
+// ---------------------------------------------------------------------
+// Conceptual framework, bound to canonical constructs (Phase 20)
+//
+// The Phase 17 `FrameworkGraph`/`ResearchFrameworkRow` types above are the
+// legacy jsonb shape and are deliberately left in place: §40 requires
+// existing free-text framework data to stay safe and unmapped until a
+// researcher decides, so nothing converts one into the other automatically.
+// ---------------------------------------------------------------------
+
+/**
+ * A node has no `role` of its own. The role a concept plays is on
+ * `research_constructs`, and repeating it here would let a node and its
+ * construct disagree about what the study says — the second source of truth
+ * §2.3 forbids. Role is read through `construct_id`.
+ */
+export interface ResearchFrameworkNodeRow {
+  id: string;
+  project_id: string;
+  /** Null means unmapped: a legacy or in-progress node awaiting a decision. */
+  construct_id: string | null;
+  /** Presentation text. Kept beside a linked construct so mapping a legacy
+   *  node does not lose its original wording; the construct's name is what
+   *  every check reads. */
+  label: string | null;
+  /** Layout only (§10). No check, finding or metric may read these. */
+  position_x: number;
+  position_y: number;
+  provenance: MethodologyProvenance;
+  confirmed: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResearchFrameworkNodeInsert {
+  project_id: string;
+  construct_id?: string | null;
+  label?: string | null;
+  position_x?: number;
+  position_y?: number;
+  provenance?: MethodologyProvenance;
+  confirmed?: boolean;
+}
+
+export interface ResearchFrameworkNodeUpdate {
+  construct_id?: string | null;
+  label?: string | null;
+  position_x?: number;
+  position_y?: number;
+  confirmed?: boolean;
+}
+
+/**
+ * §7's vocabulary, and no more. Each word corresponds to something the
+ * Phase 18 model can already justify — `mediates`/`moderates` to construct
+ * roles, `predicts`/`influences` to directional hypotheses — and
+ * `associated_with` is the non-directional default for a relationship the
+ * researcher does not want to overclaim.
+ */
+export type FrameworkRelationType =
+  | "predicts" | "influences" | "mediates" | "moderates" | "associated_with" | "supports";
+
+export const FRAMEWORK_RELATION_LABELS: Record<FrameworkRelationType, string> = {
+  predicts: "predicts",
+  influences: "influences",
+  mediates: "mediates",
+  moderates: "moderates",
+  associated_with: "is associated with",
+  supports: "supports",
+};
+
+/** The relation types that assert a direction, so reversing the endpoints
+ *  changes what is claimed. `associated_with` does not, which is why a
+ *  direction mismatch against a hypothesis is only reported for these. */
+export const DIRECTIONAL_RELATION_TYPES: readonly FrameworkRelationType[] = [
+  "predicts", "influences", "mediates", "moderates", "supports",
+];
+
+/**
+ * `hypothesis_id` belongs to the relationship, not to either node: a
+ * hypothesis is a statement about a *pair* of constructs. Same shape as
+ * `ResearchHypothesisVariableRow` (position held by the link) and
+ * `ResearchClaimEvidenceRow` (support held by the link).
+ */
+export interface ResearchFrameworkRelationshipRow {
+  id: string;
+  project_id: string;
+  from_node_id: string;
+  to_node_id: string;
+  relation_type: FrameworkRelationType;
+  /** Null when the relationship is drawn but not yet tied to a hypothesis, or
+   *  when the hypothesis it named was deleted. */
+  hypothesis_id: string | null;
+  rationale: string | null;
+  provenance: MethodologyProvenance;
+  confirmed: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResearchFrameworkRelationshipInsert {
+  project_id: string;
+  from_node_id: string;
+  to_node_id: string;
+  relation_type?: FrameworkRelationType;
+  hypothesis_id?: string | null;
+  rationale?: string | null;
+  provenance?: MethodologyProvenance;
+  confirmed?: boolean;
+}
+
+export interface ResearchFrameworkRelationshipUpdate {
+  relation_type?: FrameworkRelationType;
+  hypothesis_id?: string | null;
+  rationale?: string | null;
+  confirmed?: boolean;
+}

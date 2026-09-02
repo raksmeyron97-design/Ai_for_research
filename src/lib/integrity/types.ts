@@ -1,3 +1,7 @@
+import type { CitationFunnel } from "./citation-funnel";
+import type { CoverageBreakdown } from "../evidence/status";
+import type { ResearchIntegrityDecisionRow } from "../db/types";
+
 /**
  * The Phase 19 review contract (§15-§18). Deliberately the same shape of
  * promise Phase 18's `MethodologyMetric`/`MethodologyFinding` make: a
@@ -47,4 +51,24 @@ export interface IntegrityFinding {
   provenance: IntegrityFindingProvenance;
   /** What to do next, phrased as a next step rather than a verdict. */
   remediation?: string;
+}
+
+/** The completeness funnel plus evidence-coverage, gathered for the Overview tab (§9/§24). */
+export interface IntegrityCoverage {
+  citation: CitationFunnel;
+  evidence: CoverageBreakdown;
+}
+
+/**
+ * §15's canonical review: always derived, never the stored source of truth.
+ * `decisions` is the one piece of real state — a researcher's disposition of
+ * a finding, keyed on that finding's own stable id (§26).
+ */
+export interface ResearchIntegrityReview {
+  projectId: string;
+  metrics: IntegrityMetric[];
+  findings: IntegrityFinding[];
+  coverage: IntegrityCoverage;
+  decisions: Record<string, ResearchIntegrityDecisionRow>;
+  generatedAt: string;
 }

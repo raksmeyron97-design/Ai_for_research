@@ -69,6 +69,10 @@ export default function ProjectWorkspace({
   const [literature, setLiterature] = useState<{ tab: LiteratureTab; sourceId?: string } | null>(null);
   const [showMethodology, setShowMethodology] = useState(false);
   const [showIntegrity, setShowIntegrity] = useState(false);
+  const [exportGate, setExportGate] = useState<{
+    format: "docx" | "pdf" | "md";
+    warnings: { id: string; title: string }[];
+  } | null>(null);
   const [insertRequest, setInsertRequest] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
 
@@ -106,6 +110,32 @@ export default function ProjectWorkspace({
     // insertion improves evidence coverage only if it really created the
     // relation (§28).
     setRefreshToken((n) => n + 1);
+  }
+
+  /**
+   * The pre-export integrity gate (§37). Warns, never blocks — a gate-check
+   * failure or a slow response must not be able to prevent an export, so
+   * both fall through to exporting directly rather than surfacing an error.
+   * Only genuine warnings pause the download, and only with a confirm step
+   * the researcher can dismiss.
+   */
+  async function triggerExport(format: "docx" | "pdf" | "md") {
+    setShowExportMenu(false);
+    const exportUrl = `/api/research/projects/${project.id}/export?format=${format}`;
+    try {
+      const res = await fetch(`/api/research/projects/${project.id}/integrity/gate`);
+      if (res.ok) {
+        const body = await res.json();
+        if (Array.isArray(body.warnings) && body.warnings.length > 0) {
+          setExportGate({ format, warnings: body.warnings });
+          return;
+        }
+      }
+    } catch {
+      // A gate check that fails should not block an export the researcher
+      // can otherwise complete.
+    }
+    window.location.href = exportUrl;
   }
 
   const editorPane =
@@ -238,14 +268,14 @@ export default function ProjectWorkspace({
             {showExportMenu && (
               <div className="absolute right-0 z-10 mt-1 w-40 rounded border border-neutral-200 bg-white py-1 shadow-lg">
                 {(["docx", "pdf", "md"] as const).map((format) => (
-                  <a
+                  <button
                     key={format}
-                    href={`/api/research/projects/${project.id}/export?format=${format}`}
-                    onClick={() => setShowExportMenu(false)}
-                    className="block px-3 py-1.5 text-sm hover:bg-neutral-50"
+                    type="button"
+                    onClick={() => void triggerExport(format)}
+                    className="block w-full px-3 py-1.5 text-left text-sm hover:bg-neutral-50"
                   >
                     {format === "docx" ? "Word (.docx)" : format === "pdf" ? "PDF" : "Markdown (.md)"}
-                  </a>
+                  </button>
                 ))}
               </div>
             )}
@@ -315,6 +345,40 @@ export default function ProjectWorkspace({
           onClose={() => setLiterature(null)}
           onGoToSection={(section) => setActiveSectionType(section)}
         />
+      )}
+
+      {exportGate && (
+        <div role="alertdialog" aria-label="Research integrity warnings" className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded bg-white p-4 text-sm shadow-lg">
+            <p className="mb-2 font-medium">
+              {exportGate.warnings.length} research integrity warning{exportGate.warnings.length === 1 ? "" : "s"}
+            </p>
+            <ul className="mb-3 max-h-40 space-y-1 overflow-y-auto text-xs text-neutral-600">
+              {exportGate.warnings.slice(0, 8).map((w) => (
+                <li key={w.id}>{w.title}</li>
+              ))}
+            </ul>
+            <p className="mb-3 text-xs text-neutral-500">
+              You can export anyway — this only flags things worth a look, it does not stop you.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setExportGate(null)}
+                className="rounded border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-50"
+              >
+                Cancel
+              </button>
+              <a
+                href={`/api/research/projects/${project.id}/export?format=${exportGate.format}`}
+                onClick={() => setExportGate(null)}
+                className="rounded bg-neutral-900 px-3 py-1.5 text-xs text-white hover:bg-neutral-800"
+              >
+                Export anyway
+              </a>
+            </div>
+          </div>
+        </div>
       )}
 
       {showIntegrity && (

@@ -14,6 +14,7 @@
 | 17 | Advanced Evidence & Literature Workspace (model + deterministic review) | COMPLETE |
 | 17B | Researcher-facing evidence & literature workspace | COMPLETE |
 | 18 | Advanced Methodology & Questionnaire Intelligence | COMPLETE |
+| 19 | Research Integrity, Citation Verification & Academic Quality | COMPLETE |
 
 ## Live AI benchmark: DEFERRED
 
@@ -54,3 +55,17 @@ is verified and the rendered result at 320/375/414px is not.
 
 See `docs/PHASE_18_METHODOLOGY_QUESTIONNAIRE_INTELLIGENCE.md` §15 for detail,
 and `docs/PHASE_18_METHODOLOGY_AUDIT.md` for the model decisions.
+
+**Phase 19:** the RLS isolation SQL (`phase19_project_isolation.sql`) was
+written and reviewed by hand but not run against real Postgres — no
+Docker/Postgres was available in the build environment. Numerical
+traceability matches a claimed number to a dataset column by a word-boundary
+name match, which is a heuristic, not a proof. There is no inline
+manuscript-text highlighting yet (findings navigate to a section, not a text
+span), no "View source" action directly from the Claims tab, and no
+deterministic half to the hypothesis↔result wording comparison since no
+computed result is stored per hypothesis. ORCID is validated but not
+persisted — no per-author entity exists to attach one to.
+
+See `docs/PHASE_19_RESEARCH_INTEGRITY_CITATION_VERIFICATION.md` §18-19 for
+detail.

@@ -10,6 +10,7 @@ import LiteratureWorkspace, { type LiteratureTab } from "@/components/Literature
 import MethodologyWorkspace from "@/components/MethodologyWorkspace";
 import QualityCheckPanel from "@/components/QualityCheckPanel";
 import QuestionnaireBuilder from "@/components/QuestionnaireBuilder";
+import ResearchIntegrityWorkspace from "@/components/ResearchIntegrityWorkspace";
 import ResearchNavigator from "@/components/ResearchNavigator";
 import SectionHistoryPane from "@/components/SectionHistoryPane";
 import SectionReviewPane from "@/components/SectionReviewPane";
@@ -67,6 +68,7 @@ export default function ProjectWorkspace({
   const [showQualityCheck, setShowQualityCheck] = useState(false);
   const [literature, setLiterature] = useState<{ tab: LiteratureTab; sourceId?: string } | null>(null);
   const [showMethodology, setShowMethodology] = useState(false);
+  const [showIntegrity, setShowIntegrity] = useState(false);
   const [insertRequest, setInsertRequest] = useState<string | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
 
@@ -264,6 +266,13 @@ export default function ProjectWorkspace({
           </button>
           <button
             type="button"
+            onClick={() => setShowIntegrity(true)}
+            className="rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50"
+          >
+            Research Integrity
+          </button>
+          <button
+            type="button"
             onClick={() => setShowQualityCheck(true)}
             className="rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50"
           >
@@ -305,6 +314,20 @@ export default function ProjectWorkspace({
           initialSourceId={literature.sourceId ?? null}
           onClose={() => setLiterature(null)}
           onGoToSection={(section) => setActiveSectionType(section)}
+        />
+      )}
+
+      {showIntegrity && (
+        <ResearchIntegrityWorkspace
+          projectId={project.id}
+          onClose={() => setShowIntegrity(false)}
+          onGoToSection={(section) => setActiveSectionType(section)}
+          onFindEvidence={(claim) => {
+            setActiveSectionType(claim.section_type);
+            setAsidePane("evidence");
+            setEvidenceRequest((prev) => ({ claimId: claim.id, nonce: (prev?.nonce ?? 0) + 1 }));
+            setShowIntegrity(false);
+          }}
         />
       )}
     </div>

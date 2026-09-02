@@ -13,6 +13,8 @@ function citation(over: Partial<ResearchCitationRow> = {}): ResearchCitationRow 
     year: new Date().getFullYear(),
     journal: null,
     doi: null,
+    pmid: null,
+    isbn: null,
     url: null,
     source_type: "article",
     tier: 2,

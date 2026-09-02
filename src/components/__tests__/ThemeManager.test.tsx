@@ -8,11 +8,11 @@ import type { ResearchCitationRow } from "@/lib/db/types";
 const CITATIONS: ResearchCitationRow[] = [
   {
     id: "cit1", project_id: "p1", citation_key: "sok2024", title: "Prevalence", authors: [], year: 2024,
-    journal: null, doi: null, url: null, source_type: null, tier: 2, status: "user_provided", created_at: "",
+    journal: null, doi: null, pmid: null, isbn: null, url: null, source_type: null, tier: 2, status: "user_provided", created_at: "",
   },
   {
     id: "cit2", project_id: "p1", citation_key: "chan2023", title: "Screening", authors: [], year: 2023,
-    journal: null, doi: null, url: null, source_type: null, tier: 2, status: "user_provided", created_at: "",
+    journal: null, doi: null, pmid: null, isbn: null, url: null, source_type: null, tier: 2, status: "user_provided", created_at: "",
   },
 ];
 

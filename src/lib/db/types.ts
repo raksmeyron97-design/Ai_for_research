@@ -440,6 +440,10 @@ export interface ResearchCitationRow {
   year: number | null;
   journal: string | null;
   doi: string | null;
+  /** Free text, same shape as `doi` — normalized on read via `normalizePmid`, never on write. */
+  pmid: string | null;
+  /** Free text, same shape as `doi` — normalized on read via `normalizeIsbn`, never on write. */
+  isbn: string | null;
   url: string | null;
   source_type: string | null;
   tier: 1 | 2 | 3 | 4 | null;
@@ -455,6 +459,8 @@ export interface ResearchCitationInsert {
   year?: number | null;
   journal?: string | null;
   doi?: string | null;
+  pmid?: string | null;
+  isbn?: string | null;
   url?: string | null;
   source_type?: string | null;
   tier?: 1 | 2 | 3 | 4 | null;
@@ -1018,6 +1024,103 @@ export interface MethodologyEventInsert {
   entity_type: MethodologyEntityType;
   entity_id?: string | null;
   action: MethodologyEventAction;
+  summary: string;
+  proposal?: Record<string, unknown> | null;
+  previous_value?: Record<string, unknown> | null;
+  new_value?: Record<string, unknown> | null;
+}
+
+// ---------------------------------------------------------------------
+// Research integrity model (Phase 19)
+// ---------------------------------------------------------------------
+
+/**
+ * A claim, traced to the single methodology node it is about. Exactly one
+ * target column is set — enforced by a check constraint, not by convention —
+ * mirroring how `questionnaire_questions` links to `construct_id` /
+ * `indicator_id` / `scale_id`.
+ */
+export interface ResearchClaimMethodologyLinkRow {
+  id: string;
+  project_id: string;
+  claim_id: string;
+  construct_id: string | null;
+  hypothesis_id: string | null;
+  indicator_id: string | null;
+  objective_id: string | null;
+  question_id: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+export interface ResearchClaimMethodologyLinkInsert {
+  project_id: string;
+  claim_id: string;
+  construct_id?: string | null;
+  hypothesis_id?: string | null;
+  indicator_id?: string | null;
+  objective_id?: string | null;
+  question_id?: string | null;
+  note?: string | null;
+}
+
+/**
+ * A researcher's disposition of one derived finding. Findings themselves are
+ * never stored — a finding id is a computed string, recomputed on every
+ * review — but the decision about it must survive the next recompute.
+ */
+export type IntegrityDecisionStatus = "open" | "reviewing" | "accepted" | "dismissed" | "resolved_manually";
+
+export interface ResearchIntegrityDecisionRow {
+  id: string;
+  project_id: string;
+  finding_id: string;
+  status: IntegrityDecisionStatus;
+  note: string | null;
+  actor_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResearchIntegrityDecisionInsert {
+  project_id: string;
+  finding_id: string;
+  status?: IntegrityDecisionStatus;
+  note?: string | null;
+  actor_id?: string | null;
+}
+
+export type ResearchIntegrityDecisionUpdate = Partial<
+  Pick<ResearchIntegrityDecisionInsert, "status" | "note">
+>;
+
+export type IntegrityEntityType =
+  | "claim" | "citation" | "evidence" | "source" | "reference" | "methodology" | "finding" | "review";
+
+export type IntegrityEventAction =
+  | "integrity_review" | "finding_reviewed" | "finding_dismissed" | "citation_changed"
+  | "evidence_linked" | "claim_reclassified" | "reference_merged" | "reference_unmerged";
+
+/** One entry in the append-only integrity audit, same shape as `MethodologyEventRow`. */
+export interface ResearchIntegrityEventRow {
+  id: string;
+  project_id: string;
+  entity_type: IntegrityEntityType;
+  /** Not a foreign key: history must survive the deletion of what it describes. */
+  entity_id: string | null;
+  action: IntegrityEventAction;
+  summary: string;
+  proposal: Record<string, unknown> | null;
+  previous_value: Record<string, unknown> | null;
+  new_value: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface ResearchIntegrityEventInsert {
+  project_id: string;
+  entity_type: IntegrityEntityType;
+  entity_id?: string | null;
+  action: IntegrityEventAction;
   summary: string;
   proposal?: Record<string, unknown> | null;
   previous_value?: Record<string, unknown> | null;

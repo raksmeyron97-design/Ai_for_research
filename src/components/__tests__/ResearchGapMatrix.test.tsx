@@ -7,7 +7,7 @@ import ResearchGapMatrix from "../ResearchGapMatrix";
 import type { ResearchCitationRow, ResearchSourceProfileRow } from "@/lib/db/types";
 
 const CITATIONS: ResearchCitationRow[] = [
-  { id: "cit1", project_id: "p1", citation_key: "sok2024", title: "Study A", authors: [], year: 2024, journal: null, doi: null, url: null, source_type: null, tier: 2, status: "user_provided", created_at: "" },
+  { id: "cit1", project_id: "p1", citation_key: "sok2024", title: "Study A", authors: [], year: 2024, journal: null, doi: null, pmid: null, isbn: null, url: null, source_type: null, tier: 2, status: "user_provided", created_at: "" },
 ];
 
 const PROFILES: ResearchSourceProfileRow[] = [

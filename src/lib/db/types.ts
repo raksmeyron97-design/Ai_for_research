@@ -994,7 +994,12 @@ export const ADAPTATION_TYPE_LABELS: Record<ItemAdaptationType, string> = {
 
 export type MethodologyEntityType =
   | "research_question" | "objective" | "construct" | "indicator" | "hypothesis"
-  | "hypothesis_variable" | "scale" | "questionnaire_item" | "framework" | "review";
+  | "hypothesis_variable" | "scale" | "questionnaire_item" | "framework" | "review"
+  // Phase 20. The legacy "framework" value refers to the whole jsonb graph;
+  // these two name a single node or relationship, which is what a researcher
+  // actually acts on. Reusing this log rather than adding a framework-specific
+  // one keeps an afternoon's decisions reconstructable from one place.
+  | "framework_node" | "framework_relationship";
 
 export type MethodologyEventAction =
   | "created" | "updated" | "deleted" | "mapped" | "unmapped" | "restored"

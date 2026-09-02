@@ -27,8 +27,31 @@ vi.mock("@/lib/security/rate-limit", () => rateLimit);
 const citationsDb = vi.hoisted(() => ({ listCitations: vi.fn() }));
 vi.mock("@/lib/db/citations", () => citationsDb);
 
-const evidenceDb = vi.hoisted(() => ({ getClaim: vi.fn() }));
+const evidenceDb = vi.hoisted(() => ({
+  getClaim: vi.fn(),
+  getEvidenceByIds: vi.fn(),
+  listClaimEvidenceForClaim: vi.fn(),
+}));
 vi.mock("@/lib/db/evidence", () => evidenceDb);
+
+const methodologyDb = vi.hoisted(() => ({ listHypotheses: vi.fn() }));
+vi.mock("@/lib/db/methodology", () => methodologyDb);
+
+const suggestions = vi.hoisted(() => ({
+  classifyClaim: vi.fn(),
+  explainCandidateEvidence: vi.fn(),
+  summarizeSourceConflict: vi.fn(),
+  suggestDuplicateReferences: vi.fn(),
+  suggestMethodologyLanguageFix: vi.fn(),
+  suggestCitationPlacement: vi.fn(),
+  compareWordingToResult: vi.fn(),
+  IntegritySuggestionError: class extends Error {
+    constructor(message: string, public readonly userMessage: string) {
+      super(message);
+    }
+  },
+}));
+vi.mock("@/lib/integrity/suggestions", () => suggestions);
 
 const integrityDb = vi.hoisted(() => ({
   linkClaimToMethodology: vi.fn(),
@@ -58,12 +81,15 @@ const decisionsRoute = await import(`${B}/decisions/route`);
 const linksRoute = await import(`${B}/claims/[claimId]/methodology-links/route`);
 const duplicatesRoute = await import(`${B}/references/duplicates/route`);
 const mergeRoute = await import(`${B}/references/merge/route`);
+const suggestRoute = await import(`${B}/suggest/route`);
 
 const PROJECT_ID = "11111111-1111-1111-1111-111111111111";
 const CLAIM_ID = "22222222-2222-2222-2222-222222222222";
 const CONSTRUCT_ID = "33333333-3333-3333-3333-333333333333";
 const PRIMARY_ID = "44444444-4444-4444-4444-444444444444";
 const DUPLICATE_ID = "55555555-5555-5555-5555-555555555555";
+const EVIDENCE_ID = "66666666-6666-6666-6666-666666666666";
+const HYPOTHESIS_ID = "77777777-7777-7777-7777-777777777777";
 
 const projectParams = Promise.resolve({ projectId: PROJECT_ID });
 const claimParams = Promise.resolve({ projectId: PROJECT_ID, claimId: CLAIM_ID });
@@ -100,6 +126,15 @@ beforeEach(() => {
   });
   referenceAudit.findDuplicateReferences.mockReturnValue([]);
   referenceMerge.mergeCitations.mockResolvedValue({ id: PRIMARY_ID, citation_key: "a" });
+
+  evidenceDb.getEvidenceByIds.mockResolvedValue([{ id: EVIDENCE_ID, citation_id: "cit-1", excerpt: "..." }]);
+  evidenceDb.listClaimEvidenceForClaim.mockResolvedValue([]);
+  methodologyDb.listHypotheses.mockResolvedValue([
+    { id: HYPOTHESIS_ID, statement: "H", direction: "unspecified" },
+  ]);
+  for (const key of ["classifyClaim", "explainCandidateEvidence", "summarizeSourceConflict", "suggestDuplicateReferences", "suggestMethodologyLanguageFix", "suggestCitationPlacement", "compareWordingToResult"] as const) {
+    suggestions[key].mockResolvedValue({ proposals: [], provenance: "ai_suggested", contextTruncated: false, notes: [] });
+  }
 });
 
 describe("every research-integrity route refuses an unauthenticated or foreign caller", () => {
@@ -120,6 +155,10 @@ describe("every research-integrity route refuses an unauthenticated or foreign c
     [
       "POST merge",
       () => mergeRoute.POST(req("POST", { primaryId: PRIMARY_ID, duplicateId: DUPLICATE_ID }), { params: projectParams }),
+    ],
+    [
+      "POST suggest (duplicate_references)",
+      () => suggestRoute.POST(req("POST", { kind: "duplicate_references" }), { params: projectParams }),
     ],
   ];
 
@@ -184,6 +223,62 @@ describe("the export gate never blocks by default (§29)", () => {
     const res = await gateRoute.GET(req("GET"), { params: projectParams });
     const body = await res.json();
     expect(body.blocking).toBe(false);
+  });
+});
+
+describe("the AI suggest route builds every candidate from the database, never from the request", () => {
+  it("rejects an unknown suggestion kind", async () => {
+    const res = await suggestRoute.POST(req("POST", { kind: "write_my_thesis" }), { params: projectParams });
+    expect(res.status).toBe(400);
+  });
+
+  it("404s a claim_classification request for a claim from another project", async () => {
+    evidenceDb.getClaim.mockResolvedValue(null);
+    const res = await suggestRoute.POST(req("POST", { kind: "claim_classification", claimId: CLAIM_ID }), {
+      params: projectParams,
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it("404s an evidence_explanation request for evidence outside this project", async () => {
+    evidenceDb.getEvidenceByIds.mockResolvedValue([]);
+    const res = await suggestRoute.POST(
+      req("POST", { kind: "evidence_explanation", claimId: CLAIM_ID, evidenceId: EVIDENCE_ID }),
+      { params: projectParams },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("refuses a conflict_summary request when fewer than two sources are linked", async () => {
+    evidenceDb.listClaimEvidenceForClaim.mockResolvedValue([]);
+    const res = await suggestRoute.POST(req("POST", { kind: "conflict_summary", claimId: CLAIM_ID }), {
+      params: projectParams,
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("404s a wording_comparison request for a hypothesis from another project", async () => {
+    methodologyDb.listHypotheses.mockResolvedValue([]);
+    const res = await suggestRoute.POST(
+      req("POST", { kind: "wording_comparison", claimId: CLAIM_ID, hypothesisId: HYPOTHESIS_ID }),
+      { params: projectParams },
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it("maps IntegritySuggestionError to a 502 with the safe user message, never the raw one", async () => {
+    suggestions.classifyClaim.mockRejectedValue(new suggestions.IntegritySuggestionError("raw provider secret", "Could not run. Nothing was saved."));
+    const res = await suggestRoute.POST(req("POST", { kind: "claim_classification", claimId: CLAIM_ID }), {
+      params: projectParams,
+    });
+    expect(res.status).toBe(502);
+    const body = await res.json();
+    expect(body.error).toBe("Could not run. Nothing was saved.");
+  });
+
+  it("succeeds a well-formed duplicate_references request", async () => {
+    const res = await suggestRoute.POST(req("POST", { kind: "duplicate_references" }), { params: projectParams });
+    expect(res.status).toBe(200);
   });
 });
 

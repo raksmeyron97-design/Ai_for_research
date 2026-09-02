@@ -118,7 +118,14 @@ function citationStateFindings(traceability: ClaimTraceability[]): IntegrityFind
     }));
 }
 
-function buildFindings(model: IntegrityModel, methodologyModel: Awaited<ReturnType<typeof loadMethodologyModel>>): IntegrityFinding[] {
+/**
+ * Exported so Phase 20's cross-system review can reuse Phase 19's rules
+ * without re-running its queries. The alternative — calling
+ * `buildResearchIntegrityReview` from there — would load the methodology
+ * model a second time for one review, which is exactly the N+1 §31 asks to be
+ * found before it ships.
+ */
+export function buildIntegrityFindings(model: IntegrityModel, methodologyModel: Awaited<ReturnType<typeof loadMethodologyModel>>): IntegrityFinding[] {
   const traceability = buildClaimTraceability(
     model.claims,
     model.citations,
@@ -159,7 +166,7 @@ function buildFindings(model: IntegrityModel, methodologyModel: Awaited<ReturnTy
   return findings.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
 }
 
-function buildIntegrityMetrics(model: IntegrityModel, findings: IntegrityFinding[]): IntegrityMetric[] {
+export function buildIntegrityMetrics(model: IntegrityModel, findings: IntegrityFinding[]): IntegrityMetric[] {
   const funnel = computeCitationFunnel(model.claims, model.claimEvidence, model.evidence, model.citations);
   const evidenceCoverage = computeCoverage(model.claims);
 
@@ -250,7 +257,7 @@ export async function buildResearchIntegrityReview(
     listIntegrityDecisions(supabase, projectId),
   ]);
 
-  const findings = buildFindings(model, methodologyModel);
+  const findings = buildIntegrityFindings(model, methodologyModel);
   const metrics = buildIntegrityMetrics(model, findings);
   const funnel = computeCitationFunnel(model.claims, model.claimEvidence, model.evidence, model.citations);
 

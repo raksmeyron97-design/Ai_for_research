@@ -74,7 +74,13 @@ create table research_framework_nodes (
     check (construct_id is not null or (label is not null and length(btrim(label)) > 0)),
 
   constraint research_framework_nodes_construct_same_project
-    foreign key (construct_id, project_id) references research_constructs(id, project_id) on delete set null
+    -- The column list matters. A bare `on delete set null` on a composite key
+    -- nulls *every* referencing column, project_id included -- and project_id
+    -- is not null, so deleting a construct would fail outright instead of
+    -- unmapping the node. Phases 17 and 18 both carry that bug; the next
+    -- migration repairs them.
+    foreign key (construct_id, project_id) references research_constructs(id, project_id)
+      on delete set null (construct_id)
 );
 
 create index research_framework_nodes_project_idx on research_framework_nodes(project_id);
@@ -82,6 +88,43 @@ create index research_framework_nodes_construct_idx on research_framework_nodes(
 alter table research_framework_nodes add constraint research_framework_nodes_id_project_key unique (id, project_id);
 create trigger research_framework_nodes_set_updated_at
   before update on research_framework_nodes for each row execute function set_updated_at();
+
+-- ---------------------------------------------------------------------
+-- Deleting a construct must leave a node the researcher can still recognise.
+--
+-- The two rules above interact: `on delete set null (construct_id)` unmaps
+-- the node, but a node created straight from a construct has no `label`, and
+-- the identifiable check then refuses the row -- so the construct could not
+-- be deleted at all.
+--
+-- Filling the label from the construct on the way out fixes that and is the
+-- better behaviour anyway: the diagram keeps a box reading "Teacher
+-- motivation", marked unmapped, instead of losing the position and the
+-- relationships the researcher drew around it. The label is last-known
+-- display text and never authoritative -- `resolveNodes()` reads the
+-- construct's name whenever one is linked -- so this does not reintroduce the
+-- second source of truth the table exists to avoid.
+--
+-- BEFORE DELETE on the parent runs ahead of the foreign key's own action,
+-- which is what makes the label present by the time the check is evaluated.
+-- ---------------------------------------------------------------------
+create function framework_node_keep_label_on_construct_delete()
+returns trigger
+language plpgsql
+as $$
+begin
+  update research_framework_nodes
+     set label = old.name
+   where construct_id = old.id
+     and project_id = old.project_id
+     and (label is null or length(btrim(label)) = 0);
+  return old;
+end;
+$$;
+
+create trigger research_constructs_keep_framework_label
+  before delete on research_constructs
+  for each row execute function framework_node_keep_label_on_construct_delete();
 
 -- One node per construct. "Duplicate construct nodes" is listed in §9 as a
 -- thing to detect, but a duplicate that the database refuses cannot occur in
@@ -151,7 +194,8 @@ create table research_framework_relationships (
   constraint research_framework_relationships_to_same_project
     foreign key (to_node_id, project_id) references research_framework_nodes(id, project_id) on delete cascade,
   constraint research_framework_relationships_hypothesis_same_project
-    foreign key (hypothesis_id, project_id) references research_hypotheses(id, project_id) on delete set null
+    foreign key (hypothesis_id, project_id) references research_hypotheses(id, project_id)
+      on delete set null (hypothesis_id)
 );
 
 create index research_framework_relationships_project_idx on research_framework_relationships(project_id);

@@ -8,7 +8,6 @@ import {
   frameworkModel,
   frameworkNode,
   frameworkRelationship,
-  hypothesis,
   hypothesisVariable,
   indicator,
   item,

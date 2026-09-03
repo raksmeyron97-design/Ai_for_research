@@ -30,6 +30,7 @@ const OVERLAYS = [
   // a generic "Close" here would have been asserting the test's own
   // assumption rather than the interface.
   { button: /^research integrity$/i, heading: /research integrity/i, close: /back to writing/i },
+  { button: /^research review$/i, heading: /^research review$/i, close: /^close$/i },
 ];
 
 test.describe("overlay workspaces fit and behave at every width (§28)", () => {
@@ -208,5 +209,51 @@ test.describe("finding to sentence (§13)", () => {
     // §13: `claim_not_located` is shown, not swallowed. A button that
     // silently does nothing reads as broken.
     await expect(page.getByText(/could not highlight that sentence/i)).toBeVisible();
+  });
+});
+
+test.describe("the cross-system review (§20, §44)", () => {
+  test("reports category metrics rather than a grade", async ({ page }) => {
+    await openProject(page, VIEWPORTS.desktop1280);
+    await page.getByRole("button", { name: /^research review$/i }).click();
+    await expect(page.getByRole("dialog", { name: /research review/i })).toBeVisible();
+
+    // The seeded project has a construct outside the framework, so Framework
+    // is one of the categories that must appear with a real metric.
+    const framework = page.getByRole("region", { name: "Framework" });
+    await expect(framework).toBeVisible();
+    await expect(framework.getByText("Framework coverage")).toBeVisible();
+
+    // §44's prohibition, checked against the rendered page.
+    await expect(page.getByText(/academic quality/i)).toHaveCount(0);
+    await expect(page.getByText(/overall score/i)).toHaveCount(0);
+  });
+
+  test("shows a metric it cannot compute as not computable, never 0%", async ({ page }) => {
+    await openProject(page, VIEWPORTS.desktop1280);
+    await page.getByRole("button", { name: /^research review$/i }).click();
+
+    const analysis = page.getByRole("region", { name: "Analysis" });
+    await expect(analysis).toBeVisible();
+    // Nothing stores a per-hypothesis result, so this one is null by design.
+    await expect(analysis.getByText("Results traced to a stored analysis")).toBeVisible();
+    await expect(analysis.getByText("Not computable").first()).toBeVisible();
+  });
+
+  test("a framework finding leads to the framework", async ({ page }) => {
+    await openProject(page, VIEWPORTS.desktop1280);
+    await page.getByRole("button", { name: /^research review$/i }).click();
+
+    const framework = page.getByRole("region", { name: "Framework" });
+    await framework.getByRole("button", { name: /take me there/i }).first().click();
+
+    await expect(page.getByRole("dialog", { name: /conceptual framework/i })).toBeVisible();
+  });
+
+  test("fits a 320px viewport", async ({ page }) => {
+    await openProject(page, VIEWPORTS.mobile320);
+    await page.getByRole("button", { name: /^research review$/i }).click();
+    await expect(page.getByRole("dialog", { name: /research review/i })).toBeVisible();
+    expect(await horizontalOverflow(page)).toBeLessThanOrEqual(2);
   });
 });

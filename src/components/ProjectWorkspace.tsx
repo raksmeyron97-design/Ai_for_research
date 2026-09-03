@@ -13,6 +13,7 @@ import QualityCheckPanel from "@/components/QualityCheckPanel";
 import QuestionnaireBuilder from "@/components/QuestionnaireBuilder";
 import ResearchIntegrityWorkspace from "@/components/ResearchIntegrityWorkspace";
 import ResearchNavigator from "@/components/ResearchNavigator";
+import ResearchReviewWorkspace from "@/components/ResearchReviewWorkspace";
 import SectionHistoryPane from "@/components/SectionHistoryPane";
 import SectionReviewPane from "@/components/SectionReviewPane";
 import WorkspacePanes, { type WorkspacePane } from "@/components/WorkspacePanes";
@@ -72,6 +73,7 @@ export default function ProjectWorkspace({
   const [literature, setLiterature] = useState<{ tab: LiteratureTab; sourceId?: string } | null>(null);
   const [showMethodology, setShowMethodology] = useState(false);
   const [showFramework, setShowFramework] = useState(false);
+  const [showReview, setShowReview] = useState(false);
   const [showIntegrity, setShowIntegrity] = useState(false);
   const [exportGate, setExportGate] = useState<{
     format: "docx" | "pdf" | "md";
@@ -344,6 +346,13 @@ export default function ProjectWorkspace({
           </button>
           <button
             type="button"
+            onClick={() => setShowReview(true)}
+            className="rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50"
+          >
+            Research review
+          </button>
+          <button
+            type="button"
             onClick={() => setLiterature({ tab: "sources" })}
             className="rounded border border-neutral-300 px-3 py-1.5 text-sm hover:bg-neutral-50"
           >
@@ -390,6 +399,22 @@ export default function ProjectWorkspace({
 
       {showFramework && (
         <ConceptualFrameworkWorkspace projectId={project.id} onClose={() => setShowFramework(false)} />
+      )}
+
+      {showReview && (
+        <ResearchReviewWorkspace
+          projectId={project.id}
+          onClose={() => setShowReview(false)}
+          onGoToSection={(section) => setActiveSectionType(section)}
+          onOpenFramework={() => {
+            setShowReview(false);
+            setShowFramework(true);
+          }}
+          onOpenMethodology={() => {
+            setShowReview(false);
+            setShowMethodology(true);
+          }}
+        />
       )}
 
       {showMethodology && (

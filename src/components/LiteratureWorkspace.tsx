@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useDialogOverlay } from "@/lib/ui/use-dialog-overlay";
 import EvidenceCard, { type EvidenceCardModel } from "@/components/EvidenceCard";
 import ResearchGapMatrix from "@/components/ResearchGapMatrix";
 import SourceComparison from "@/components/SourceComparison";
@@ -167,8 +168,18 @@ export default function LiteratureWorkspace({
     };
   }
 
+  // §33: dialog semantics — focus moves in, is trapped, and returns to
+  // whatever opened this when it closes. Escape closes.
+  const overlayRef = useDialogOverlay(onClose);
+
   return (
-    <div className="fixed inset-0 z-20 flex flex-col bg-white">
+    <div
+      ref={overlayRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Literature"
+      className="fixed inset-0 z-20 flex flex-col bg-white"
+    >
       <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
         <h2 className="text-sm font-medium">Literature</h2>
         <button

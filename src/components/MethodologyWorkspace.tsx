@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useDialogOverlay } from "@/lib/ui/use-dialog-overlay";
 import ConstructPanel from "@/components/ConstructPanel";
 import CoverageMatrixView from "@/components/CoverageMatrixView";
 import HypothesisPanel from "@/components/HypothesisPanel";
@@ -177,8 +178,18 @@ export default function MethodologyWorkspace({
     setTab(TAB_FOR_TARGET[finding.targetType] ?? "overview");
   }
 
+  // §33: dialog semantics — focus moves in, is trapped, and returns to
+  // whatever opened this when it closes. Escape closes.
+  const overlayRef = useDialogOverlay(onClose);
+
   return (
-    <div className="fixed inset-0 z-30 flex flex-col bg-white">
+    <div
+      ref={overlayRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Methodology"
+      className="fixed inset-0 z-30 flex flex-col bg-white"
+    >
       <header className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
         <div>
           <h2 className="font-medium">Methodology</h2>

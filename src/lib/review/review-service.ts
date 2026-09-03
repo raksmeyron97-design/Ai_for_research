@@ -10,6 +10,7 @@ import {
 import { runConsistencyChecks } from "../methodology/consistency";
 import { loadMethodologyModel } from "../methodology/review-service";
 import { fromIntegrityFinding, fromMethodologyFinding } from "./adapters";
+import { runAnalysisChecks } from "./analysis-traceability";
 import { runCrossSystemChecks } from "./cross-system";
 import type { ResearchSystemReview, ReviewCategory, ReviewFinding, ReviewMetric } from "./types";
 import { sortFindings } from "./types";
@@ -94,12 +95,21 @@ export async function buildResearchSystemReview(
     methodologyLinks: integrityModel.methodologyLinks,
     methodology,
   });
+  // Datasets are already loaded on the integrity model for Phase 19's
+  // numerical checks, so this adds no query (§31).
+  const analysis = runAnalysisChecks({
+    claims: integrityModel.claims,
+    methodologyLinks: integrityModel.methodologyLinks,
+    methodology,
+    datasets: integrityModel.datasets,
+  });
 
   const findings: ReviewFinding[] = [
     ...methodologyResult.findings.map(fromMethodologyFinding),
     ...integrityFindings.map(fromIntegrityFinding),
     ...frameworkResult.findings,
     ...crossSystem.findings,
+    ...analysis.findings,
   ];
 
   const metrics: ReviewMetric[] = [
@@ -115,6 +125,7 @@ export async function buildResearchSystemReview(
     })),
     ...frameworkResult.metrics,
     ...crossSystem.metrics,
+    ...analysis.metrics,
   ];
 
   return {

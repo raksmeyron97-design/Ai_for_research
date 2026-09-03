@@ -24,9 +24,12 @@ async function horizontalOverflow(page: Page): Promise<number> {
 }
 
 const OVERLAYS = [
-  { button: /^framework$/i, heading: /conceptual framework/i },
-  { button: /^methodology$/i, heading: /^methodology$/i },
-  { button: /^research integrity$/i, heading: /research integrity/i },
+  { button: /^framework$/i, heading: /conceptual framework/i, close: /^close$/i },
+  { button: /^methodology$/i, heading: /^methodology$/i, close: /^close$/i },
+  // The integrity overlay's dismiss control is worded differently. Asserting
+  // a generic "Close" here would have been asserting the test's own
+  // assumption rather than the interface.
+  { button: /^research integrity$/i, heading: /research integrity/i, close: /back to writing/i },
 ];
 
 test.describe("overlay workspaces fit and behave at every width (§28)", () => {
@@ -47,7 +50,7 @@ test.describe("overlay workspaces fit and behave at every width (§28)", () => {
         // The close control has to be on screen, not pushed off the edge by a
         // long title — which is exactly what happens at 320px if the header
         // does not allow the heading to shrink.
-        const close = page.getByRole("button", { name: /^close$/i }).first();
+        const close = page.getByRole("button", { name: overlay.close }).first();
         await expect(close).toBeVisible();
         const box = await close.boundingBox();
         expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width + 2);
@@ -190,12 +193,13 @@ test.describe("finding to sentence (§13)", () => {
     await openProject(page, VIEWPORTS.desktop1280);
 
     // Rewrite the results section so the claim can no longer be found.
-    const editor = page.locator("textarea[id^='section-editor-']").first();
-    await page.getByRole("button", { name: /^results$/i }).first().click();
+    // The navigator button's accessible name carries its status glyph
+    // ("● Results"), so this cannot be anchored at the start.
+    await page.getByRole("button", { name: /Results$/ }).first().click();
+    const editor = page.locator("textarea[id^='section-editor-results']");
     await expect(editor).toBeVisible();
     await editor.fill("Everything in this section has been rewritten since the claims were extracted.");
-    // Let the debounced autosave land.
-    await expect(page.getByText(/saved/i).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText("Saved", { exact: true })).toBeVisible({ timeout: 20_000 });
 
     await page.getByRole("button", { name: /^research integrity$/i }).click();
     await page.getByRole("tab", { name: /^claims$/i }).click();

@@ -17,7 +17,9 @@ import SectionReviewPane from "@/components/SectionReviewPane";
 import WorkspacePanes, { type WorkspacePane } from "@/components/WorkspacePanes";
 import SectionEditor from "@/components/SectionEditor";
 import { SECTION_CHAIN } from "@/lib/db/types";
+import type { ClaimLocation } from "@/lib/integrity/claim-location";
 import type {
+  ResearchClaimRow,
   ResearchDocumentRow,
   ResearchProjectRow,
   ResearchSectionRow,
@@ -86,6 +88,12 @@ export default function ProjectWorkspace({
   const [externalUpdate, setExternalUpdate] = useState<{ content: string; nonce: number } | null>(null);
   /** Bumped to make the Review and History panes refetch (§28, §29). */
   const [refreshToken, setRefreshToken] = useState(0);
+  // A claim to find and select in the editor, and where that ended up (§13).
+  const [highlightClaim, setHighlightClaim] = useState<{
+    claim: ResearchClaimRow;
+    nonce: number;
+  } | null>(null);
+  const [highlightResult, setHighlightResult] = useState<ClaimLocation | null>(null);
 
   const statuses = useMemo(() => {
     const result = {} as Record<SectionType, SectionStatus>;
@@ -138,6 +146,31 @@ export default function ProjectWorkspace({
     window.location.href = exportUrl;
   }
 
+  /**
+   * §13: when a claim cannot be found, say so. Silently doing nothing after
+   * the researcher clicked "Show in manuscript" reads as a broken button, and
+   * the honest answer — the sentence has been edited since the claim was
+   * extracted — is information they need before trusting any other finding
+   * about that claim.
+   */
+  const highlightNotice =
+    highlightResult && highlightResult.outcome !== "located" ? (
+      <div
+        role="status"
+        className="mb-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+      >
+        <span className="font-medium">Could not highlight that sentence. </span>
+        {highlightResult.explanation}
+        <button
+          type="button"
+          onClick={() => setHighlightResult(null)}
+          className="ml-2 underline focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-700"
+        >
+          Dismiss
+        </button>
+      </div>
+    ) : null;
+
   const editorPane =
     activeSectionType === "questionnaire" ? (
       <QuestionnaireBuilder projectId={project.id} />
@@ -160,8 +193,21 @@ export default function ProjectWorkspace({
           setEvidenceRequest((prev) => ({ passage, passageOffset: offset, nonce: (prev?.nonce ?? 0) + 1 }));
           setAsidePane("evidence");
         }}
+        highlightClaim={
+          highlightClaim && highlightClaim.claim.section_type === activeSectionType
+            ? highlightClaim
+            : null
+        }
+        onHighlightResolved={setHighlightResult}
       />
     );
+
+  const editorPaneWithNotice = (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {highlightNotice}
+      {editorPane}
+    </div>
+  );
 
   const panes: WorkspacePane[] = [
     {
@@ -176,7 +222,7 @@ export default function ProjectWorkspace({
         />
       ),
     },
-    { id: "editor", label: "Editor", region: "editor", node: editorPane },
+    { id: "editor", label: "Editor", region: "editor", node: editorPaneWithNotice },
     {
       id: "review",
       label: "Review",
@@ -385,7 +431,11 @@ export default function ProjectWorkspace({
         <ResearchIntegrityWorkspace
           projectId={project.id}
           onClose={() => setShowIntegrity(false)}
-          onGoToSection={(section) => setActiveSectionType(section)}
+          onGoToSection={(section, claim) => {
+            setActiveSectionType(section);
+            setHighlightResult(null);
+            if (claim) setHighlightClaim((prev) => ({ claim, nonce: (prev?.nonce ?? 0) + 1 }));
+          }}
           onFindEvidence={(claim) => {
             setActiveSectionType(claim.section_type);
             setAsidePane("evidence");

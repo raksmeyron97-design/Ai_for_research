@@ -10,6 +10,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:browser": "playwright test",
     "ai:models": "vitest run --config vitest.benchmark.config.ts tests/ai-benchmark/models.bench.ts",
     "ai:benchmark": "vitest run --config vitest.benchmark.config.ts tests/ai-benchmark/cli.bench.ts",
     "ai:benchmark:smoke": "AI_BENCH_SUITE=smoke npm run ai:benchmark",
@@ -42,6 +43,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
+    "@playwright/test": "^1.62.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.6",

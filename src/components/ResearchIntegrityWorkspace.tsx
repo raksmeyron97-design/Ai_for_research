@@ -192,7 +192,12 @@ export default function ResearchIntegrityWorkspace({
   projectId: string;
   initialTab?: IntegrityTab;
   onClose: () => void;
-  onGoToSection?: (section: SectionType) => void;
+  /**
+   * Phase 19 could only name the section. §13 asks for the sentence, so the
+   * claim travels with the request and the editor locates it — or reports
+   * `claim_not_located`, which is a real answer rather than a failure.
+   */
+  onGoToSection?: (section: SectionType, claim?: ResearchClaimRow) => void;
   /** Optional: wired by the caller to the existing evidence-search UI. The button renders only when given. */
   onFindEvidence?: (claim: ResearchClaimRow) => void;
   /** Optional: wired by the caller to the existing citation editor. The button renders only when given. */
@@ -443,12 +448,12 @@ export default function ResearchIntegrityWorkspace({
                             <button
                               type="button"
                               onClick={() => {
-                                onGoToSection(claim.section_type);
+                                onGoToSection(claim.section_type, claim);
                                 onClose();
                               }}
                               className="rounded border border-neutral-300 px-1.5 py-0.5 text-[11px] hover:bg-neutral-50"
                             >
-                              View in section
+                              Show in manuscript
                             </button>
                           )}
                           {onFindEvidence && (

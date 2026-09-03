@@ -122,8 +122,14 @@ export default function WorkspacePanes({
               role="tabpanel"
               id={`pane-panel-${pane.id}`}
               aria-labelledby={`mobile-tab-${pane.id}`}
-              className={`min-h-0 overflow-y-auto lg:block lg:overflow-visible ${
-                activeMobile === pane.id ? "block h-full" : "hidden"
+              // `flex flex-col`, not `block`. A pane's content sizes itself
+              // with `flex-1` so the editor fills its column; inside a block
+              // parent that does nothing, and the editor collapsed to its
+              // content height — a 72px textarea in an 827px column, at every
+              // width including desktop. Caught by measuring a real layout;
+              // jsdom reports the classes either way.
+              className={`flex min-h-0 flex-col overflow-y-auto lg:flex lg:overflow-visible ${
+                activeMobile === pane.id ? "h-full" : "hidden lg:flex"
               } ${pane.region === "navigator" ? "lg:border-r lg:border-neutral-200" : ""}`}
             >
               {pane.node}
@@ -153,9 +159,9 @@ export default function WorkspacePanes({
               role="tabpanel"
               id={`pane-panel-${pane.id}`}
               aria-labelledby={`mobile-tab-${pane.id}`}
-              className={`min-h-0 overflow-y-auto ${activeMobile === pane.id ? "block h-full" : "hidden"} ${
-                activeAside === pane.id ? "lg:block lg:h-full" : "lg:hidden"
-              }`}
+              className={`min-h-0 flex-col overflow-y-auto ${
+                activeMobile === pane.id ? "flex h-full" : "hidden"
+              } ${activeAside === pane.id ? "lg:flex lg:h-full" : "lg:hidden"}`}
             >
               {pane.node}
             </div>

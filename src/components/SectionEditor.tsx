@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  locateClaimInSection,
+  type ClaimLocation,
+  type HighlightableClaim,
+} from "@/lib/integrity/claim-location";
 import AIChangeControl, { type ChangeAction } from "@/components/AIChangeControl";
 import SectionActions from "@/components/SectionActions";
 import type { SectionAction, SectionActionId } from "@/lib/ai/sections/actions";
@@ -32,6 +37,8 @@ export default function SectionEditor({
   onInsertConsumed,
   externalUpdate,
   onFindEvidence,
+  highlightClaim,
+  onHighlightResolved,
 }: {
   projectId: string;
   sectionType: SectionType;
@@ -49,6 +56,16 @@ export default function SectionEditor({
   externalUpdate?: { content: string; nonce: number } | null;
   /** Sends the selected paragraph to the Evidence pane (§27). */
   onFindEvidence?: (passage: string, offset: number) => void;
+  /**
+   * A claim to find and select in this section (§13). `nonce` is what makes
+   * asking twice for the same claim work — the researcher can click a finding
+   * again after scrolling away, and without it the effect would not re-run.
+   */
+  highlightClaim?: { claim: HighlightableClaim; nonce: number } | null;
+  /** Reports where the highlight ended up, including when it could not be
+   *  placed — `claim_not_located` is a state the caller has to show, not an
+   *  error to swallow (§13). */
+  onHighlightResolved?: (location: ClaimLocation) => void;
 }) {
   const [content, setContent] = useState(initialSection?.content ?? "");
   const [status, setStatus] = useState<SectionStatus>(initialSection?.status ?? "not_started");
@@ -108,6 +125,42 @@ export default function SectionEditor({
     setSelection(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalUpdate?.nonce]);
+
+  // Finding -> claim -> section -> the sentence itself (§13).
+  //
+  // Runs against `content` — the text on screen right now, not the snapshot
+  // the claim was extracted from. Asking "is this sentence still here" of a
+  // stale copy would always answer yes, which is how a researcher ends up
+  // staring at a highlight over the wrong words.
+  useEffect(() => {
+    if (!highlightClaim) return;
+
+    const location = locateClaimInSection(content, highlightClaim.claim);
+    onHighlightResolved?.(location);
+
+    if (location.outcome !== "located" || location.start == null || location.end == null) return;
+
+    const el = textareaRef.current;
+    if (!el) return;
+
+    // focus() before setSelectionRange(): a selection in an unfocused
+    // textarea is invisible in every browser, so the researcher would be told
+    // the sentence was found and shown nothing.
+    el.focus();
+    el.setSelectionRange(location.start, location.end);
+
+    // Scroll the selection into view. A textarea will not do this on its own
+    // for a programmatic selection, so the line is measured from the text
+    // before it and the scrollTop set directly.
+    const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 20;
+    const linesBefore = content.slice(0, location.start).split("\n").length - 1;
+    el.scrollTop = Math.max(0, linesBefore * lineHeight - el.clientHeight / 2);
+
+    setSelection({ text: content.slice(location.start, location.end), start: location.start });
+    // `content` is deliberately not a dependency: re-running on every
+    // keystroke would fight the researcher for their cursor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightClaim?.nonce]);
 
   function captureSelection(el: HTMLTextAreaElement) {
     const text = el.value.slice(el.selectionStart, el.selectionEnd).trim();

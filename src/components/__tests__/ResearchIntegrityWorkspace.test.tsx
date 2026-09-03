@@ -206,12 +206,18 @@ describe("claims tab — evidence state, citation mismatch, navigation", () => {
     expect(within(claimsPanel).getByText("No citation present")).toBeInTheDocument();
   });
 
-  it("offers View in section, calling onGoToSection and closing the workspace", async () => {
+  it("sends the claim as well as the section, so the editor can find the sentence", async () => {
+    // Phase 19 could only name the section. §13 wants the sentence, which
+    // means the claim has to travel with the request — the editor cannot
+    // locate what it was not given.
     const onGoToSection = vi.fn();
     const onClose = vi.fn();
     render(<ResearchIntegrityWorkspace projectId="p1" onClose={onClose} onGoToSection={onGoToSection} initialTab="claims" />);
-    await userEvent.click(await screen.findByRole("button", { name: "View in section" }));
-    expect(onGoToSection).toHaveBeenCalledWith("results");
+    await userEvent.click(await screen.findByRole("button", { name: "Show in manuscript" }));
+    expect(onGoToSection).toHaveBeenCalledWith(
+      "results",
+      expect.objectContaining({ claim_text: expect.any(String) }),
+    );
     expect(onClose).toHaveBeenCalled();
   });
 

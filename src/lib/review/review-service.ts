@@ -87,6 +87,8 @@ export async function buildResearchSystemReview(
   const methodologyResult = runConsistencyChecks(methodology);
   const frameworkResult = runFrameworkChecks(framework);
   const integrityFindings = buildIntegrityFindings(integrityModel, methodology);
+  // Metrics still read the full integrity list: `reference_integrity`
+  // counts reference-category findings, which the relay does not touch.
   const integrityMetrics = buildIntegrityMetrics(integrityModel, integrityFindings);
   const crossSystem = runCrossSystemChecks({
     claims: integrityModel.claims,
@@ -104,9 +106,22 @@ export async function buildResearchSystemReview(
     datasets: integrityModel.datasets,
   });
 
+  // Phase 19's review relays Phase 18's own `runConsistencyChecks` findings
+  // through `manuscript-consistency.ts`, and Phase 18's engine is called
+  // directly above — so every methodology finding arrived here twice, once as
+  // `methodology:<id>` and once as `integrity:methodology:<id>`, under two
+  // categories and two target types. That is exactly the "same finding twice
+  // under two names" this service promises not to do.
+  //
+  // The direct pass is the one kept: it carries the real target
+  // (`questionnaire_item` rather than a flattened `project`) and the right
+  // category, so a finding about an item lands under Questionnaire where the
+  // researcher can act on it.
+  const integrityOwn = integrityFindings.filter((f) => !f.id.startsWith("methodology:"));
+
   const findings: ReviewFinding[] = [
     ...methodologyResult.findings.map(fromMethodologyFinding),
-    ...integrityFindings.map(fromIntegrityFinding),
+    ...integrityOwn.map(fromIntegrityFinding),
     ...frameworkResult.findings,
     ...crossSystem.findings,
     ...analysis.findings,

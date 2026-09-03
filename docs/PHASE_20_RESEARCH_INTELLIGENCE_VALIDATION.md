@@ -1,6 +1,6 @@
 # Phase 20 — Research Intelligence Validation, Conceptual Framework & Production Verification
 
-**Status: COMPLETE.** 1499 tests across 135 files (was 1340 across 127 at the
+**Status: COMPLETE.** 1508 tests across 136 files (was 1340 across 127 at the
 close of Phase 19, tip `84ae9fd`), plus a 45-test real-browser suite. Lint,
 typecheck, build and the offline dry benchmark pass.
 
@@ -211,6 +211,18 @@ engine it is careful not to overlap:
 `ReviewFinding.relatedTo` carries the other end of an edge, so §20's "identify
 the exact broken edge" can name both objects without inventing a joined
 pseudo-object.
+
+**One finding, one place.** Phase 19's review relays Phase 18's own
+`runConsistencyChecks` findings through `manuscript-consistency.ts`, and Phase
+20 calls Phase 18 directly — so every methodology finding initially arrived
+twice, as `methodology:<id>` and `integrity:methodology:<id>`, under two
+categories and two target types. A researcher would have seen each one in two
+places with no way to tell they were the same thing. The relayed copies are
+dropped and the direct pass kept, because it carries the real target
+(`questionnaire_item`, not a flattened `project`) so a finding about an item
+lands under Questionnaire where it can be acted on. Found by the §43 workflow
+test; there is a regression test asserting no duplicate ids and no surviving
+`integrity:methodology:` prefix.
 
 ### Severity discipline (§23)
 
@@ -522,10 +534,18 @@ differently, and nothing promotes a suggestion to `deterministic`.
 
 | | Phase 19 | Phase 20 |
 | --- | --- | --- |
-| Vitest tests | 1340 | 1499 |
-| Vitest files | 127 | 135 |
+| Vitest tests | 1340 | 1508 |
+| Vitest files | 127 | 136 |
 | Browser tests | 0 | 45 |
 | Isolation suites executed | 3 of 4 | 5 of 5 |
+
+§43's full workflow test builds the whole graph — question → objective →
+construct → indicator → hypothesis → framework node → relationship →
+questionnaire item → claim → citation → evidence → source, plus the
+claim↔methodology link — then breaks it four ways (evidence relation removed,
+item mapping cleared, relationship deleted, construct link cleared), asserts
+the specific finding each break produces, repairs it, and asserts the finding
+is gone. A cached review would pass every break and fail every repair.
 
 New coverage: the canonical framework model and its checks; framework ↔
 methodology synchronisation including direction disagreement; claim location
@@ -593,7 +613,7 @@ New to this phase, and deliberate:
 
 | Gate | Result |
 | --- | --- |
-| `npm test` | 1499 / 135 files, pass |
+| `npm test` | 1508 / 136 files, pass |
 | `npm run lint` | pass |
 | `npm run typecheck` | pass |
 | `npm run build` | pass |

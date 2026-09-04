@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authorizeProject, dbErrorResponse } from "@/lib/api/authorize";
 import { searchCitations } from "@/lib/db/citations";
+import { withEvent } from "@/lib/observability/events";
 
 /**
  * Server-side source search (§17-§19).
@@ -65,19 +66,26 @@ export async function GET(req: Request, { params }: { params: Promise<{ projectI
   // dragged past itself, not a malformed request, and an empty result with
   // the filters still shown is the readable answer.
   try {
-    const result = await searchCitations(auth.auth.supabase, projectId, {
-      query: input.q ?? null,
-      yearFrom: input.yearFrom ?? null,
-      yearTo: input.yearTo ?? null,
-      sourceTypes: input.sourceTypes ?? null,
-      statuses: input.statuses ?? null,
-      hasDoi: input.hasDoi ?? null,
-      hasEvidence: input.hasEvidence ?? null,
-      isCited: input.isCited ?? null,
-      themeId: input.themeId ?? null,
-      limit: input.limit,
-      offset: input.offset,
-    });
+    // §33: one event per search, carrying how long it took and how many rows
+    // came back — never the query string, which is the researcher's own
+    // wording and is exactly the kind of content §34 keeps out of logs.
+    const result = await withEvent(
+      { name: "source_search", projectId },
+      () => searchCitations(auth.auth.supabase, projectId, {
+        query: input.q ?? null,
+        yearFrom: input.yearFrom ?? null,
+        yearTo: input.yearTo ?? null,
+        sourceTypes: input.sourceTypes ?? null,
+        statuses: input.statuses ?? null,
+        hasDoi: input.hasDoi ?? null,
+        hasEvidence: input.hasEvidence ?? null,
+        isCited: input.isCited ?? null,
+        themeId: input.themeId ?? null,
+        limit: input.limit,
+        offset: input.offset,
+      }),
+      (r) => ({ count: r.total, status: r.total === 0 ? "empty" : "ok" }),
+    );
 
     return NextResponse.json({
       sources: result.rows,

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { authorizeProject, dbErrorResponse } from "@/lib/api/authorize";
 import { listFrameworkNodes, reorderFrameworkNodes } from "@/lib/db/framework";
 import { recordMethodologyEvent } from "@/lib/db/methodology-events";
+import { recordEvent } from "@/lib/observability/events";
 
 /**
  * Reorder the whole framework (Phase 21 §13, §36, §50).
@@ -40,10 +41,23 @@ export async function PUT(req: Request, { params }: { params: Promise<{ projectI
   const auth = await authorizeProject(projectId);
   if (!auth.ok) return auth.response;
 
+  const started = Date.now();
   let nodes;
   try {
     nodes = await reorderFrameworkNodes(auth.auth.supabase, projectId, parsed.data.nodeIds);
   } catch {
+    // §33/§36: the operational event says the reorder was REFUSED. It is
+    // emitted here, in the failure path, rather than optimistically before
+    // the call — an event claiming a mutation that did not happen is worse
+    // than no event.
+    recordEvent({
+      name: "framework_reordered",
+      projectId,
+      status: "denied",
+      errorClass: "validation",
+      count: parsed.data.nodeIds.length,
+      durationMs: Date.now() - started,
+    });
     // The function raises invalid_parameter_value for a duplicate id, a
     // partial order, or an id from another project. All three are the caller
     // sending an order that does not describe this framework, which is a 400
@@ -59,7 +73,18 @@ export async function PUT(req: Request, { params }: { params: Promise<{ projectI
     );
   }
 
-  // One event for one action, after the reorder has actually committed (§36).
+  recordEvent({
+    name: "framework_reordered",
+    projectId,
+    status: "ok",
+    count: parsed.data.nodeIds.length,
+    durationMs: Date.now() - started,
+  });
+
+  // One audit entry for one action, after the reorder has actually committed
+  // (§36). The audit trail is the researcher's record of their own decisions
+  // and is append-only; the operational event above is for whoever runs the
+  // service. They are different readers, so they are different logs.
   // Best-effort like every other audit write: the change is real, and
   // `audited: false` says the history entry is missing rather than letting the
   // caller assume one exists.

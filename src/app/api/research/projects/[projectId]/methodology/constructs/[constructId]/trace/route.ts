@@ -5,6 +5,7 @@ import { listFrameworkNodes, listFrameworkRelationships } from "@/lib/db/framewo
 import { listClaimMethodologyLinks } from "@/lib/db/integrity";
 import { listClaims } from "@/lib/db/evidence";
 import { traceConstruct } from "@/lib/methodology/construct-trace";
+import { recordEvent } from "@/lib/observability/events";
 
 /**
  * What in this study depends on one construct (Phase 21 §25).
@@ -55,6 +56,17 @@ export async function GET(
     if (!trace) {
       return NextResponse.json({ error: "That construct was not found." }, { status: 404 });
     }
+
+    // The count is the number of unrecorded connections, which is the one
+    // number here worth trending: it says whether researchers are leaving
+    // concepts unmeasured, without saying anything about which concepts.
+    recordEvent({
+      name: "construct_trace_opened",
+      projectId,
+      objectId: constructId,
+      status: trace.gaps.length > 0 ? "partial" : "ok",
+      count: trace.gaps.length,
+    });
 
     return NextResponse.json({ trace });
   } catch {

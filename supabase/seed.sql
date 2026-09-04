@@ -1,0 +1,33 @@
+-- Seed data for a local `supabase db reset`.
+--
+-- Deliberately empty of rows, and deliberately not deleted (Phase 21 §4).
+--
+-- `supabase/config.toml` declares `sql_paths = ["./seed.sql"]`. Before Phase
+-- 21 no such file existed, so every single reset printed
+--
+--     WARN: no files matched pattern: supabase/seed.sql
+--
+-- which is exactly the kind of warning a new engineer cannot distinguish from
+-- a real problem: it appears at the end of a successful reset and says a
+-- declared input is missing. Either the declaration or the file had to go,
+-- and the file is the better half to keep, because it gives the project one
+-- named place for global seed data if it ever needs some.
+--
+-- Why there are no rows in it:
+--
+-- Every table in this schema is project-scoped and every project belongs to a
+-- `auth.users` row. Seeding research data globally would mean inventing a
+-- user, and a fabricated account that exists in every developer's database is
+-- a worse default than an empty one — it is an unowned login with rows behind
+-- it that look like someone's real work.
+--
+-- Test data is created by the tests that need it, against a user they create
+-- and own:
+--
+--   * `tests/browser/seed.ts`               — the Playwright fixture project
+--   * `supabase/tests/phase*_isolation.sql` — two throwaway users per suite
+--   * `src/lib/**/__tests__`                — in-memory fixtures, no database
+--
+-- so a clean reset leaves a schema, not a scenario. That is the intent:
+-- `npm run db:reset` gives an empty, correct database, and §48's empty-project
+-- behaviour is then the default state rather than a special case.

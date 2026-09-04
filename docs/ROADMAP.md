@@ -16,6 +16,7 @@
 | 18 | Advanced Methodology & Questionnaire Intelligence | COMPLETE |
 | 19 | Research Integrity, Citation Verification & Academic Quality | COMPLETE |
 | 20 | Research Intelligence Validation, Conceptual Framework & Production Verification | COMPLETE |
+| 21 | Production Reproducibility, Workspace Completion & Operational Hardening | COMPLETE |
 
 ## Live AI benchmark: DEFERRED
 
@@ -83,3 +84,26 @@ verification needs a local Supabase stack and an installed Chrome. The live AI
 benchmark remains the only deferred gate.
 
 See `docs/PHASE_20_RESEARCH_INTELLIGENCE_VALIDATION.md` §18-19 for detail.
+
+**Phase 21:** the clean bootstrap is closed — `supabase db reset` applies all
+26 migrations from an empty database with no manual step, and all six
+isolation suites pass against that database rather than an accreted one. The
+dry benchmark can no longer overwrite the live provider record, and the
+committed record is now labelled for what it is: a successful credential probe
+plus a smoke run whose twelve calls all came back `UNAVAILABLE`, not a
+completed live benchmark. The framework's stored layout is editable and
+persists; the source search built in Phase 20 finally has a caller, so the
+Sources tab no longer loads the whole library to filter it in the browser.
+
+Still open. The browser suite is not in CI — it needs a built app, a Supabase
+stack and a real Chrome, so it stays a local gate (71 tests, six widths,
+executed). The CI workflow itself is new and has never run: there is no
+Actions runner in this environment, so its green-ness is an expectation rather
+than a result. Performance budgets are local measurements against Docker
+Postgres, good for catching a plan regression and not a statement about
+production latency. Operational events have one sink (`console`) and are wired
+into three routes; nothing aggregates or alerts on them. The framework still
+has no visual diagram. The live AI benchmark remains the only deferred gate.
+
+See `docs/PHASE_21_PRODUCTION_REPRODUCIBILITY_WORKSPACE_HARDENING.md` §13-15
+for detail.

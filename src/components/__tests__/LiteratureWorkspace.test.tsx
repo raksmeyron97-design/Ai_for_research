@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import LiteratureWorkspace from "../LiteratureWorkspace";
 
@@ -16,9 +16,28 @@ const CITATIONS = [
   { id: "cit2", project_id: "p1", citation_key: "chan2023", title: "Screening tools", authors: [], year: 2023, journal: null, doi: null, url: null, source_type: null, tier: 2, status: "user_provided", created_at: "" },
 ];
 
+/** What `search_project_sources` returns, filtered the way the database would.
+ *  Kept honest deliberately: a stub that ignores `q` would let a component
+ *  that never sends it pass. */
+function searchResponse(url: string) {
+  const params = new URL(url, "http://test.local").searchParams;
+  const q = (params.get("q") ?? "").toLowerCase();
+  const matched = CITATIONS.filter(
+    (c) => !q || `${c.citation_key} ${c.title} ${c.authors.join(" ")}`.toLowerCase().includes(q),
+  );
+  return {
+    sources: matched.map((c) => ({ ...c, evidence_count: 0, claim_count: 0 })),
+    total: matched.length,
+    limit: 25,
+    offset: 0,
+    filtered: [...params.keys()].some((k) => k !== "limit" && k !== "offset"),
+  };
+}
+
 function stub(overrides: Record<string, unknown> = {}) {
   const fetchMock = vi.fn(async (input: unknown) => {
     const url = String(input);
+    if (url.includes("/sources/search")) return { ok: true, json: async () => searchResponse(url) };
     if (url.includes("/citations")) return { ok: true, json: async () => ({ citations: CITATIONS }) };
     if (url.includes("/evidence")) return { ok: true, json: async () => ({ evidence: overrides.evidence ?? [] }) };
     if (url.includes("/themes")) return { ok: true, json: async () => ({ themes: [], assignments: [] }) };
@@ -57,17 +76,59 @@ describe("literature workspace", () => {
     ]);
   });
 
-  it("lists sources and searches them without a round trip per keystroke", async () => {
+  it("searches on the server rather than filtering a fully loaded library", async () => {
+    // Phase 21 §17-§20. This used to assert the opposite — that typing caused
+    // no request — which was only achievable by having fetched every source
+    // in the project up front. That is fine at twelve sources and wrong at
+    // two hundred and fifty, and it left the search function built in Phase
+    // 20 with no caller.
     const fetchMock = stub();
     render(<LiteratureWorkspace projectId="p1" onClose={vi.fn()} />);
     expect(await screen.findByText("Prevalence study")).toBeInTheDocument();
 
-    const before = fetchMock.mock.calls.length;
-    await userEvent.type(screen.getByLabelText("Search sources"), "screening");
+    // The default tab must not pull the whole library across the wire.
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/citations"))).toBe(false);
 
-    expect(screen.queryByText("Prevalence study")).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText(/search your sources/i), "screening");
+
+    // Wait for the narrowed result rather than for "Screening tools", which
+    // is on screen from the start — the assertion has to be about what the
+    // search removed.
+    await waitFor(() => expect(screen.queryByText("Prevalence study")).not.toBeInTheDocument());
     expect(screen.getByText("Screening tools")).toBeInTheDocument();
-    expect(fetchMock.mock.calls.length).toBe(before);
+
+    const searches = fetchMock.mock.calls.filter(([url]) => String(url).includes("/sources/search"));
+    expect(searches.length).toBeGreaterThan(0);
+    // Debounced: nine keystrokes must not be nine queries.
+    expect(searches.length).toBeLessThan(9);
+    expect(String(searches[searches.length - 1][0])).toContain("q=screening");
+  });
+
+  it("says the search covers this library, not the published literature", async () => {
+    // §18: "no results" from a search box is otherwise read as "no such
+    // research exists".
+    stub();
+    render(<LiteratureWorkspace projectId="p1" onClose={vi.fn()} />);
+    await screen.findByText("Prevalence study");
+
+    await userEvent.type(screen.getByLabelText(/search your sources/i), "nothing matches this");
+
+    expect(
+      await screen.findByText(/No sources in this library match the current search/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/not the published literature/i)).toBeInTheDocument();
+  });
+
+  it("asks the server for a filter instead of intersecting arrays in the browser", async () => {
+    const fetchMock = stub();
+    render(<LiteratureWorkspace projectId="p1" onClose={vi.fn()} />);
+    await screen.findByText("Prevalence study");
+
+    await userEvent.click(screen.getByRole("combobox", { name: "Cited" }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Cited" }), "false");
+
+    const searches = fetchMock.mock.calls.filter(([url]) => String(url).includes("/sources/search"));
+    expect(String(searches[searches.length - 1][0])).toContain("isCited=false");
   });
 
   it("carries the selection from Compare through to Research gaps", async () => {

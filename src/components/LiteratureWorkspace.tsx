@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useDialogOverlay } from "@/lib/ui/use-dialog-overlay";
 import EvidenceCard, { type EvidenceCardModel } from "@/components/EvidenceCard";
 import ResearchGapMatrix from "@/components/ResearchGapMatrix";
 import SourceComparison from "@/components/SourceComparison";
 import SourceDetailPanel from "@/components/SourceDetailPanel";
+import SourceSearchPanel from "@/components/SourceSearchPanel";
 import ThemeManager from "@/components/ThemeManager";
 import type {
   ResearchCitationRow,
@@ -59,24 +60,45 @@ export default function LiteratureWorkspace({
   // of one workspace rather than separate pages.
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [openSourceId, setOpenSourceId] = useState<string | null>(initialSourceId ?? null);
-  const [filter, setFilter] = useState<string[] | null>(null);
-  const [search, setSearch] = useState("");
+  /** Set from the Themes tab. The id is what the server filters on; the name
+   *  is only so the Sources tab can say which theme is applied. */
+  const [themeFilter, setThemeFilter] = useState<{ id: string; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/research/projects/${projectId}/citations`);
-      if (!res.ok) throw new Error("Your sources could not be loaded.");
-      const body = await res.json();
-      setCitations(body.citations ?? []);
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  }, [projectId]);
+  /**
+   * The whole citation list, for the tabs that genuinely need one (§32).
+   *
+   * Sources no longer does: it searches and pages on the server. Themes,
+   * Compare and Research gaps are pickers over the library, and Evidence
+   * needs the lookup to name each excerpt's source — so the fetch is deferred
+   * until one of those is opened rather than paid for on the default tab.
+   *
+   * Loaded once and kept: switching between those four tabs is not a reason
+   * to re-fetch, and the selection they share would flicker if it were.
+   */
+  const [citationsLoaded, setCitationsLoaded] = useState(false);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (tab === "sources" || citationsLoaded) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/research/projects/${projectId}/citations`);
+        if (!res.ok) throw new Error("Your sources could not be loaded.");
+        const body = await res.json();
+        if (cancelled) return;
+        setCitations(body.citations ?? []);
+        setCitationsLoaded(true);
+      } catch (err) {
+        if (!cancelled) setError((err as Error).message);
+      }
+    })();
+    // Cancelled on unmount and on a tab change, so a response arriving after
+    // the researcher moved on does not write state behind them (§51).
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, citationsLoaded, projectId]);
 
   // Evidence is fetched only when its tab is opened (§38) — a project with
   // hundreds of excerpts should not pay for them to open the Sources list.
@@ -140,14 +162,6 @@ export default function LiteratureWorkspace({
   }, [tab, selectedIds, projectId]);
 
   const citationById = new Map(citations.map((c) => [c.id, c]));
-
-  const visibleCitations = citations
-    .filter((c) => (filter ? filter.includes(c.id) : true))
-    .filter((c) =>
-      search.trim()
-        ? `${c.citation_key} ${c.title ?? ""} ${c.authors.join(" ")}`.toLowerCase().includes(search.toLowerCase())
-        : true,
-    );
 
   function evidenceModel(row: ResearchEvidenceRow): EvidenceCardModel {
     const citation = citationById.get(row.citation_id);
@@ -242,54 +256,12 @@ export default function LiteratureWorkspace({
         ) : (
           <>
             <div role="tabpanel" id="lit-panel-sources" aria-labelledby="lit-tab-sources" hidden={tab !== "sources"}>
-              <div className="mb-3 flex items-center gap-2">
-                <label htmlFor="source-search" className="sr-only">
-                  Search sources
-                </label>
-                <input
-                  id="source-search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by key, title or author"
-                  className="w-full max-w-xs rounded border border-neutral-300 px-2 py-1.5 text-xs focus:border-neutral-500 focus:outline-none"
-                />
-                {filter && (
-                  <button
-                    type="button"
-                    onClick={() => setFilter(null)}
-                    className="rounded border border-neutral-300 px-2 py-1.5 text-xs"
-                  >
-                    Clear theme filter
-                  </button>
-                )}
-              </div>
-
-              {visibleCitations.length === 0 ? (
-                <p className="rounded border border-neutral-200 p-4 text-center text-xs text-neutral-600">
-                  {citations.length === 0
-                    ? "No sources yet. Add one from the Documents panel to start building your literature."
-                    : "No sources match that search."}
-                </p>
-              ) : (
-                <ul className="space-y-1">
-                  {visibleCitations.map((citation) => (
-                    <li key={citation.id}>
-                      <button
-                        type="button"
-                        onClick={() => setOpenSourceId(citation.id)}
-                        className="w-full rounded border border-neutral-200 p-2 text-left text-xs hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900"
-                      >
-                        <span className="font-medium">{citation.title ?? citation.citation_key}</span>
-                        <span className="mt-0.5 block text-[11px] text-neutral-500">
-                          {(citation.authors.length ? citation.authors.join(", ") : "Unknown author") +
-                            (citation.year ? ` · ${citation.year}` : "")}{" "}
-                          · <span className="font-mono">[{citation.citation_key}]</span>
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <SourceSearchPanel
+                projectId={projectId}
+                themeFilter={themeFilter}
+                onClearThemeFilter={() => setThemeFilter(null)}
+                onOpenSource={setOpenSourceId}
+              />
             </div>
 
             <div role="tabpanel" id="lit-panel-evidence" aria-labelledby="lit-tab-evidence" hidden={tab !== "evidence"}>
@@ -319,8 +291,11 @@ export default function LiteratureWorkspace({
               <ThemeManager
                 projectId={projectId}
                 citations={citations}
-                onFilter={(ids) => {
-                  setFilter(ids);
+                onFilter={(theme) => {
+                  // The theme id, not the list of assigned citation ids: the
+                  // filter is now a database predicate rather than an array
+                  // the browser intersects with a fully loaded library.
+                  setThemeFilter(theme);
                   setTab("sources");
                 }}
               />

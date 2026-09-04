@@ -21,7 +21,11 @@ export default function ThemeManager({
   projectId: string;
   citations: ResearchCitationRow[];
   /** Filters the Sources tab to a theme, which is what makes themes useful rather than decorative. */
-  onFilter?: (citationIds: string[] | null) => void;
+  /** Filter the Sources tab by this theme. Phase 21: the theme's identity,
+   *  not the list of citation ids assigned to it — the Sources tab filters on
+   *  the server now, so it needs the predicate rather than a precomputed
+   *  answer that goes stale the moment an assignment changes. */
+  onFilter?: (theme: { id: string; name: string } | null) => void;
 }) {
   const [themes, setThemes] = useState<ResearchThemeRow[]>([]);
   const [assignments, setAssignments] = useState<ResearchThemeSourceRow[]>([]);
@@ -231,7 +235,7 @@ export default function ThemeManager({
                     {onFilter && (
                       <button
                         type="button"
-                        onClick={() => onFilter(assigned)}
+                        onClick={() => onFilter({ id: theme.id, name: theme.name })}
                         className="rounded border border-neutral-300 px-2 py-1 text-[11px]"
                       >
                         Filter

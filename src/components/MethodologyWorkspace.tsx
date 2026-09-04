@@ -317,6 +317,7 @@ export default function MethodologyWorkspace({
 
             <div role="tabpanel" id="meth-panel-constructs" aria-labelledby="meth-tab-constructs" hidden={tab !== "constructs"}>
               <ConstructPanel
+                projectId={projectId}
                 constructs={model.constructs}
                 indicators={model.indicators}
                 busy={busy}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import AISuggestionCard from "@/components/AISuggestionCard";
+import ConstructTracePanel from "@/components/ConstructTracePanel";
 import { CONSTRUCT_ROLE_LABELS } from "@/lib/db/types";
 import type { ConstructRole, ResearchConstructRow, ResearchIndicatorRow } from "@/lib/db/types";
 import type { RewriteProposal } from "@/lib/methodology/suggestions";
@@ -20,6 +21,7 @@ const ROLES: ConstructRole[] = [
 ];
 
 export default function ConstructPanel({
+  projectId,
   constructs,
   indicators,
   busy,
@@ -33,6 +35,10 @@ export default function ConstructPanel({
   definitionSuggestions,
   suggestionsFor,
 }: {
+  /** Optional so existing callers and tests that only exercise the editing
+   *  behaviour keep working; without it the traceability panel, which is the
+   *  only part that needs to fetch, is simply not offered. */
+  projectId?: string;
   constructs: ResearchConstructRow[];
   indicators: ResearchIndicatorRow[];
   busy?: boolean;
@@ -289,6 +295,20 @@ export default function ConstructPanel({
                         </button>
                       </form>
                     </div>
+
+                    {/* Phase 21 §25. Fetched only when the construct is open,
+                        so a workspace with thirty constructs does not pay for
+                        thirty traces to render a list of names. */}
+                    {projectId && (
+                      <details className="rounded border border-neutral-200 px-2 py-1.5">
+                        <summary className="cursor-pointer text-[11px] text-neutral-700">
+                          What depends on this concept
+                        </summary>
+                        <div className="mt-2">
+                          <ConstructTracePanel projectId={projectId} constructId={construct.id} />
+                        </div>
+                      </details>
+                    )}
                   </div>
                 )}
               </li>

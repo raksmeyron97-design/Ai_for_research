@@ -27,7 +27,9 @@ afterEach(() => {
 });
 
 function stub(trace: unknown, ok = true) {
-  const mock = vi.fn(async () => ({ ok, json: async () => (ok ? { trace } : {}) }));
+  // The parameter is declared so the mock's call tuple is typed and the URL
+  // assertion below can read it.
+  const mock = vi.fn(async (_input: unknown) => ({ ok, json: async () => (ok ? { trace } : {}) }));
   vi.stubGlobal("fetch", mock);
   return mock;
 }

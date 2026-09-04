@@ -330,23 +330,22 @@ function NodesSection({
         Concepts in the framework ({resolved.length})
       </h3>
 
+      {/* An <ol> below, not a <ul> (Phase 21 §13). The list has an order the
+          researcher controls, so its position has to be conveyed — and an
+          ordered list has a screen reader announce "3 of 7" for free, which is
+          better than a number rendered into the name, where it would be read
+          out as part of the concept. */}
       {resolved.length === 0 ? (
         <p className="mt-1 text-xs text-neutral-600">
           No concepts yet. Add the constructs your study relates to each other.
         </p>
       ) : (
-        <ul className="mt-2 space-y-2">
+        <ol className="mt-2 space-y-2">
           {resolved.map((r, index) => (
             <li key={r.node.id} className="rounded border border-neutral-200 p-2 text-xs">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="font-medium">
-                    {/* The position is announced, not just implied by the
-                        order — a screen reader reading one row out of context
-                        otherwise has no way to know a reorder did anything. */}
-                    <span className="mr-1 text-neutral-400">{index + 1}.</span>
-                    {r.displayName}
-                  </p>
+                  <p className="font-medium">{r.displayName}</p>
                   {r.construct ? (
                     <>
                       <p className="text-neutral-600">
@@ -477,11 +476,22 @@ function NodesSection({
                       onChange={(e) => setRenaming({ id: r.node.id, value: e.target.value })}
                       onKeyDown={(e) => {
                         // Escape cancels the rename without closing the
-                        // workspace behind it. Without this the dialog's own
-                        // Escape handler fires and the researcher loses the
-                        // whole panel for pressing cancel.
+                        // workspace behind it — otherwise the researcher loses
+                        // the whole panel for pressing cancel.
+                        //
+                        // Three calls, and none is redundant. Next hydrates
+                        // the document, so React's delegated listener and the
+                        // overlay's Escape listener are both on `document`:
+                        // `stopPropagation` does not stop a sibling listener
+                        // on the dispatching node, which is why this needs
+                        // `stopImmediatePropagation` on the native event.
+                        // `preventDefault` is what the overlay checks, and is
+                        // the part that keeps working if the listener ever
+                        // moves off `document`.
                         if (e.key === "Escape") {
+                          e.preventDefault();
                           e.stopPropagation();
+                          e.nativeEvent.stopImmediatePropagation();
                           setRenaming(null);
                         }
                       }}
@@ -506,7 +516,7 @@ function NodesSection({
               )}
             </li>
           ))}
-        </ul>
+        </ol>
       )}
 
       <form

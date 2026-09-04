@@ -71,13 +71,28 @@ export function useDialogOverlay(onClose: () => void) {
      * this rename". It applies to every nested editor these overlays will
      * grow, and getting it wrong loses whatever the researcher had open.
      *
-     * On bubble, an inner handler's `stopPropagation()` means exactly what it
-     * reads as: this control handled Escape, the dialog should not also act on
-     * it. Escape pressed anywhere else still reaches document and still
-     * closes.
+     * On bubble, an inner control can claim Escape — but `stopPropagation()`
+     * alone is not enough to claim it, and finding out why took a real
+     * browser.
+     *
+     * Next's App Router hydrates the whole document, so React's delegated
+     * listener is attached to `document` — the same node this listener is on.
+     * `stopPropagation()` stops an event reaching *other* nodes; it does
+     * nothing to a sibling listener on the node currently dispatching. So a
+     * React `onKeyDown` that called `stopPropagation()` still let this handler
+     * run, and Escape in the framework's rename field closed the entire
+     * workspace. jsdom could not show it: Testing Library renders into a
+     * container div, so React's root is not `document` there and the same code
+     * behaves correctly. It took `tests/browser/phase21.spec.ts`.
+     *
+     * `defaultPrevented` is the mechanism that does work here, and it is the
+     * standard one for "this event has been handled". An inner control calls
+     * `preventDefault()` (and `stopImmediatePropagation()` on the native event
+     * as the direct guarantee), and this handler stands down.
      */
     function onEscape(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
+      if (event.defaultPrevented) return;
       onClose();
     }
 

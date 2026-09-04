@@ -135,6 +135,131 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe("layout and renaming (Phase 21 §13-§16)", () => {
+  /** Every fetch the component made that was not a GET. */
+  function writes() {
+    const mock = (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mock;
+    return mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method &&
+      (init as RequestInit).method !== "GET");
+  }
+
+  it("reorders with buttons, not a drag handle, and sends the whole order at once", async () => {
+    render(<ConceptualFrameworkWorkspace projectId="p1" onClose={vi.fn()} />);
+    const region = await conceptsRegion();
+
+    // The second concept moves up. Named by the concept rather than by
+    // position, because that is what a screen reader announces.
+    await userEvent.click(
+      await within(region).findByRole("button", { name: /move student performance up/i }),
+    );
+
+    const puts = writes().filter(([, init]) => (init as RequestInit).method === "PUT");
+    expect(puts).toHaveLength(1);
+    expect(puts[0][0]).toBe("/api/research/projects/p1/framework/nodes/order");
+    // One request carrying the complete order — not one PATCH per moved node,
+    // which is what makes a half-applied reorder impossible (§36).
+    expect(JSON.parse((puts[0][1] as RequestInit).body as string)).toEqual({
+      nodeIds: ["fn-b", "fn-a"],
+    });
+  });
+
+  it("renders concepts in the stored layout order, not creation order", async () => {
+    // fn-b sorts first by position even though fn-a was created first. The
+    // server does the ordering; this asserts the component does not undo it.
+    nodes = [node({ id: "fn-b", construct_id: "con-b" }), node()];
+
+    render(<ConceptualFrameworkWorkspace projectId="p1" onClose={vi.fn()} />);
+    const region = await conceptsRegion();
+
+    const items = within(region).getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("Student performance");
+    expect(items[1]).toHaveTextContent("Teacher motivation");
+  });
+
+  it("cannot move the first concept up or the last one down", async () => {
+    render(<ConceptualFrameworkWorkspace projectId="p1" onClose={vi.fn()} />);
+    const region = await conceptsRegion();
+
+    expect(await within(region).findByRole("button", { name: /move teacher motivation up/i })).toBeDisabled();
+    expect(within(region).getByRole("button", { name: /move student performance down/i })).toBeDisabled();
+    // ...and the ones in between are live, so "disabled" is not just "always".
+    expect(within(region).getByRole("button", { name: /move teacher motivation down/i })).toBeEnabled();
+  });
+
+  it("renames an unmapped concept", async () => {
+    nodes = [node({ id: "fn-c", construct_id: null, label: "School climate" })];
+
+    render(<ConceptualFrameworkWorkspace projectId="p1" onClose={vi.fn()} />);
+    const region = await conceptsRegion();
+
+    await userEvent.click(await within(region).findByRole("button", { name: /rename/i }));
+    const field = within(region).getByLabelText(/rename this concept/i);
+    await userEvent.clear(field);
+    await userEvent.type(field, "School culture");
+    await userEvent.click(within(region).getByRole("button", { name: /save name/i }));
+
+    const patches = writes().filter(([, init]) => (init as RequestInit).method === "PATCH");
+    expect(patches).toHaveLength(1);
+    expect(patches[0][0]).toBe("/api/research/projects/p1/framework/nodes/fn-c");
+    expect(JSON.parse((patches[0][1] as RequestInit).body as string)).toEqual({
+      label: "School culture",
+    });
+  });
+
+  it("does not offer to rename a concept whose name comes from its construct", async () => {
+    // Editing the label of a mapped node would be a second source of truth
+    // for the concept's name — the thing canonical binding exists to remove.
+    render(<ConceptualFrameworkWorkspace projectId="p1" onClose={vi.fn()} />);
+    const region = await conceptsRegion();
+
+    await within(region).findByText("Teacher motivation");
+    expect(within(region).queryByRole("button", { name: /rename/i })).toBeNull();
+  });
+
+  it("refuses to save an empty name rather than deleting the concept", async () => {
+    nodes = [node({ id: "fn-c", construct_id: null, label: "School climate" })];
+
+    render(<ConceptualFrameworkWorkspace projectId="p1" onClose={vi.fn()} />);
+    const region = await conceptsRegion();
+
+    await userEvent.click(await within(region).findByRole("button", { name: /rename/i }));
+    await userEvent.clear(within(region).getByLabelText(/rename this concept/i));
+
+    expect(within(region).getByRole("button", { name: /save name/i })).toBeDisabled();
+    expect(writes()).toHaveLength(0);
+  });
+
+  it("Escape still closes the workspace from anywhere that has not claimed it", async () => {
+    // The other half of the rename fix: moving Escape to the bubble phase
+    // must not cost the overlay its keyboard exit (§29).
+    const onClose = vi.fn();
+    render(<ConceptualFrameworkWorkspace projectId="p1" onClose={onClose} />);
+    const region = await conceptsRegion();
+
+    await userEvent.click(within(region).getAllByRole("button", { name: /remove/i })[0]);
+    await userEvent.keyboard("{Escape}");
+
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("cancelling a rename closes the field and keeps the workspace open", async () => {
+    // Escape inside the rename field must not fall through to the dialog's own
+    // Escape handler and close the whole panel.
+    const onClose = vi.fn();
+    nodes = [node({ id: "fn-c", construct_id: null, label: "School climate" })];
+
+    render(<ConceptualFrameworkWorkspace projectId="p1" onClose={onClose} />);
+    const region = await conceptsRegion();
+
+    await userEvent.click(await within(region).findByRole("button", { name: /rename/i }));
+    await userEvent.type(within(region).getByLabelText(/rename this concept/i), "{Escape}");
+
+    expect(within(region).queryByLabelText(/rename this concept/i)).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(writes()).toHaveLength(0);
+  });
+});
+
 describe("concepts", () => {
   it("names a node by its construct, not by stored text", async () => {
     render(<ConceptualFrameworkWorkspace projectId="p1" onClose={vi.fn()} />);

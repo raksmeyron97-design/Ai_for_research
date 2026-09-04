@@ -32,6 +32,19 @@ function stamped<T extends object>(patch: T): T & { updated_at: string } {
 // ---------------------------------------------------------------------
 // Nodes
 // ---------------------------------------------------------------------
+/**
+ * Ordered by the researcher's layout, then by creation (Phase 21 §13).
+ *
+ * Phase 20 ordered by `created_at` alone, which made the stored coordinates
+ * unreachable: a node could be moved and the list would not move with it. The
+ * order is now position first, so a reorder is visible, with `created_at` and
+ * then `id` behind it — `id` last for the same reason the source search
+ * carries it, that a list ordered only by columns which can tie is a list
+ * whose rows swap places between two reads of the same data.
+ *
+ * §15: this reads coordinates to *display* nodes in an order. Nothing that
+ * decides anything about the research reads them.
+ */
 export async function listFrameworkNodes(
   supabase: SupabaseClient,
   projectId: string,
@@ -40,10 +53,35 @@ export async function listFrameworkNodes(
     .from(NODES)
     .select("*")
     .eq("project_id", projectId)
-    .order("created_at", { ascending: true });
+    .order("position_y", { ascending: true })
+    .order("position_x", { ascending: true })
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true });
 
   if (error) throw toDbError(error, "listFrameworkNodes");
   return data as ResearchFrameworkNodeRow[];
+}
+
+/**
+ * Applies a complete node order in one statement (Phase 21 §13, §36, §50).
+ *
+ * Delegates to the `reorder_framework_nodes` function rather than issuing one
+ * PATCH per node, so the whole order lands or none of it does. The function
+ * runs SECURITY INVOKER, so a caller naming another project's node updates
+ * nothing and gets an error rather than a partial reorder.
+ */
+export async function reorderFrameworkNodes(
+  supabase: SupabaseClient,
+  projectId: string,
+  orderedNodeIds: string[],
+): Promise<ResearchFrameworkNodeRow[]> {
+  const { data, error } = await supabase.rpc("reorder_framework_nodes", {
+    p_project_id: projectId,
+    p_node_ids: orderedNodeIds,
+  });
+
+  if (error) throw toDbError(error, "reorderFrameworkNodes");
+  return (data ?? []) as ResearchFrameworkNodeRow[];
 }
 
 export async function getFrameworkNode(

@@ -26,10 +26,19 @@ import {
  * every width: every node and relationship is a real focusable row, readable
  * by a screen reader in the order the study is structured.
  *
- * Coordinates are still stored and still editable (§10), because a researcher
- * who does lay the diagram out expects it to stay laid out. They are
- * presentation data: nothing here reads them to decide anything, and the
- * checks below never see them.
+ * Coordinates are stored, and since Phase 21 (§13) they are editable from
+ * here: "Move up" / "Move down" reorders the concepts and the order persists.
+ * Buttons rather than drag-and-drop, deliberately — a drag handle is the
+ * mouse-only interaction §33 rules out, and reordering is the one layout
+ * operation a list can express honestly.
+ *
+ * The whole order goes in one PUT, not one PATCH per moved node: a reorder
+ * that half-applies leaves the framework in an order the researcher never
+ * chose (§36, §50).
+ *
+ * Coordinates remain presentation data. Nothing here reads them to decide
+ * anything, and the checks below never see them — moving a concept up the
+ * list cannot change what the study claims (§15).
  */
 const RELATION_TYPES = Object.keys(FRAMEWORK_RELATION_LABELS) as FrameworkRelationType[];
 
@@ -188,6 +197,13 @@ export default function ConceptualFrameworkWorkspace({
               onRemove={(id) =>
                 mutate(`/nodes/${id}`, { method: "DELETE" }, "That node could not be removed.")
               }
+              onReorder={(nodeIds) =>
+                mutate(
+                  "/nodes/order",
+                  { method: "PUT", body: JSON.stringify({ nodeIds }) },
+                  "That reordering could not be saved.",
+                )
+              }
             />
 
             <RelationshipsSection
@@ -279,6 +295,7 @@ function NodesSection({
   onAdd,
   onPatch,
   onRemove,
+  onReorder,
 }: {
   resolved: ReturnType<typeof resolveNodes>;
   availableConstructs: MethodologyModel["constructs"];
@@ -287,9 +304,25 @@ function NodesSection({
   onAdd: (body: Record<string, unknown>) => void;
   onPatch: (id: string, body: Record<string, unknown>) => void;
   onRemove: (id: string) => void;
+  onReorder: (nodeIds: string[]) => void;
 }) {
   const [constructId, setConstructId] = useState("");
   const [label, setLabel] = useState("");
+  /** Which unmapped node is being renamed, and the text so far. Only one at a
+   *  time: two open editors over one list is a way to lose an edit. */
+  const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
+
+  // Send the whole order, computed from the list as rendered. Deriving it here
+  // rather than sending "move node X up" means the server is told the order
+  // the researcher actually saw, so a list that changed underneath is rejected
+  // rather than silently reordered around a stale assumption.
+  function move(index: number, delta: number) {
+    const target = index + delta;
+    if (target < 0 || target >= resolved.length) return;
+    const ids = resolved.map((r) => r.node.id);
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    onReorder(ids);
+  }
 
   return (
     <section aria-labelledby="fw-nodes-heading" className="rounded border border-neutral-200 p-3">
@@ -303,11 +336,17 @@ function NodesSection({
         </p>
       ) : (
         <ul className="mt-2 space-y-2">
-          {resolved.map((r) => (
+          {resolved.map((r, index) => (
             <li key={r.node.id} className="rounded border border-neutral-200 p-2 text-xs">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="font-medium">{r.displayName}</p>
+                  <p className="font-medium">
+                    {/* The position is announced, not just implied by the
+                        order — a screen reader reading one row out of context
+                        otherwise has no way to know a reorder did anything. */}
+                    <span className="mr-1 text-neutral-400">{index + 1}.</span>
+                    {r.displayName}
+                  </p>
                   {r.construct ? (
                     <>
                       <p className="text-neutral-600">
@@ -335,6 +374,45 @@ function NodesSection({
                 </div>
 
                 <div className="flex shrink-0 flex-wrap gap-1.5">
+                  {/* Layout, §13. Buttons rather than a drag handle: dragging
+                      is the mouse-only interaction §33 rules out, and these
+                      work identically with a keyboard, a screen reader and a
+                      320px touch target. Disabled at the ends rather than
+                      hidden, so the control does not move between rows. */}
+                  <button
+                    type="button"
+                    disabled={busy || index === 0}
+                    onClick={() => move(index, -1)}
+                    className="rounded border border-neutral-300 px-1.5 py-0.5 text-[11px] hover:bg-neutral-50 disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900"
+                  >
+                    <span aria-hidden="true">↑</span>
+                    <span className="sr-only">Move {r.displayName} up</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || index === resolved.length - 1}
+                    onClick={() => move(index, 1)}
+                    className="rounded border border-neutral-300 px-1.5 py-0.5 text-[11px] hover:bg-neutral-50 disabled:opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900"
+                  >
+                    <span aria-hidden="true">↓</span>
+                    <span className="sr-only">Move {r.displayName} down</span>
+                  </button>
+
+                  {/* Renaming is offered only for an unmapped node. A mapped
+                      node's name comes from its construct, and editing the
+                      label here would create the second source of truth the
+                      canonical binding exists to remove — rename the
+                      construct in the methodology workspace instead. */}
+                  {r.unmapped && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setRenaming({ id: r.node.id, value: r.node.label ?? "" })}
+                      className="rounded border border-neutral-300 px-1.5 py-0.5 text-[11px] hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900"
+                    >
+                      Rename
+                    </button>
+                  )}
                   {r.unmapped && constructs.length > 0 && (
                     <label className="flex items-center gap-1">
                       <span className="sr-only">Link {r.displayName} to a construct</span>
@@ -373,6 +451,59 @@ function NodesSection({
                   </button>
                 </div>
               </div>
+
+              {renaming?.id === r.node.id && (
+                <form
+                  className="mt-2 flex flex-wrap items-end gap-2 border-t border-neutral-200 pt-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const next = renaming.value.trim();
+                    // An empty rename is a no-op, not a delete. The database
+                    // would refuse it anyway — a node with neither a construct
+                    // nor a label fails `research_framework_nodes_identifiable`
+                    // — and failing here says so in words rather than as a 500.
+                    if (!next) return;
+                    if (next !== (r.node.label ?? "")) onPatch(r.node.id, { label: next });
+                    setRenaming(null);
+                  }}
+                >
+                  <label className="flex flex-1 flex-col gap-1 text-[11px]">
+                    Rename this concept
+                    <input
+                      type="text"
+                      autoFocus
+                      value={renaming.value}
+                      maxLength={200}
+                      onChange={(e) => setRenaming({ id: r.node.id, value: e.target.value })}
+                      onKeyDown={(e) => {
+                        // Escape cancels the rename without closing the
+                        // workspace behind it. Without this the dialog's own
+                        // Escape handler fires and the researcher loses the
+                        // whole panel for pressing cancel.
+                        if (e.key === "Escape") {
+                          e.stopPropagation();
+                          setRenaming(null);
+                        }
+                      }}
+                      className="rounded border border-neutral-300 px-2 py-1 text-xs"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={busy || !renaming.value.trim()}
+                    className="rounded bg-neutral-900 px-3 py-1.5 text-xs text-white disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
+                  >
+                    Save name
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRenaming(null)}
+                    className="rounded border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900"
+                  >
+                    Cancel
+                  </button>
+                </form>
+              )}
             </li>
           ))}
         </ul>

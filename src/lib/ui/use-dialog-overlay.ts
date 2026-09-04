@@ -20,7 +20,8 @@ import { useEffect, useRef } from "react";
  *     place is not lost
  *
  * Escape closes, because a full-screen overlay with no keyboard exit is a trap
- * in the other sense.
+ * in the other sense — but it closes on the *bubble* phase, so a control
+ * inside the overlay can claim Escape for itself. See below.
  *
  * `aria-modal` is set by the caller alongside `role="dialog"`; this hook does
  * not inject attributes, so the markup stays readable where it is written.
@@ -55,12 +56,35 @@ export function useDialogOverlay(onClose: () => void) {
     // `ref.current`, which TypeScript cannot prove is still non-null.
     const root = container;
 
+    /**
+     * Escape, on the bubble phase (Phase 21).
+     *
+     * This used to live in the capture listener below, and that was wrong in a
+     * way nothing could work around: a capture listener on `document` runs
+     * *before* the element the researcher is actually typing in, so pressing
+     * Escape in any control inside the overlay closed the whole overlay, and
+     * the control's own `onKeyDown` never ran to prevent it. Checking
+     * `defaultPrevented` would not have helped either — at capture time
+     * nothing has had the chance to set it.
+     *
+     * Found by the framework rename field, where Escape has to mean "cancel
+     * this rename". It applies to every nested editor these overlays will
+     * grow, and getting it wrong loses whatever the researcher had open.
+     *
+     * On bubble, an inner handler's `stopPropagation()` means exactly what it
+     * reads as: this control handled Escape, the dialog should not also act on
+     * it. Escape pressed anywhere else still reaches document and still
+     * closes.
+     */
+    function onEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      onClose();
+    }
+
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        onClose();
-        return;
-      }
+      // Tab stays on capture: focus trapping has to win against anything else
+      // listening, and no inner control legitimately wants Tab to escape the
+      // overlay.
       if (event.key !== "Tab") return;
 
       const items = focusable();
@@ -82,8 +106,10 @@ export function useDialogOverlay(onClose: () => void) {
     }
 
     document.addEventListener("keydown", onKeyDown, true);
+    document.addEventListener("keydown", onEscape);
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
+      document.removeEventListener("keydown", onEscape);
       // Only if it is still in the document: the element that opened the
       // overlay may itself have been re-rendered away.
       if (previouslyFocused && document.contains(previouslyFocused)) previouslyFocused.focus();

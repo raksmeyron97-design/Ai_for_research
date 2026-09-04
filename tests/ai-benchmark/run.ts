@@ -323,6 +323,7 @@ export async function runBenchmark(overrides: Partial<BenchmarkConfig> = {}): Pr
     const report = buildReport({
       runId,
       suite: config.suite,
+      mode: config.dryRun ? "dry" : "live",
       plannedCalls: units.length,
       commit: commitSha(),
       status,
@@ -339,6 +340,13 @@ export async function runBenchmark(overrides: Partial<BenchmarkConfig> = {}): Pr
     writeMarkdown(config.outDir, markdown);
 
     console.log(`[benchmark] ${budget.requestsUsed} provider call(s) made. Status: ${status}`);
+    if (config.dryRun) {
+      // Say it at the end, where it is read, and say where the live record
+      // still is — the whole point of the redirect is that this run did not
+      // touch it (Phase 21 §11).
+      console.log("[benchmark] DRY RUN — results are MOCKED; no provider was contacted.");
+      console.log(`[benchmark] live artifacts under ${config.outDirBase} were not modified.`);
+    }
     console.log(`[benchmark] wrote ${config.outDir}/latest.json and ${config.outDir}/latest.md`);
 
     return { status, statuses, summaries, results, markdown };

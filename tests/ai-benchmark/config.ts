@@ -39,9 +39,42 @@ export interface BenchmarkConfig {
   dryRun: boolean;
   /** Run the LLM-as-judge pass (requires a live provider that is not the one under test). */
   judge: boolean;
+  /**
+   * Where this run's artifacts go. Derived, never taken raw from the
+   * environment: a dry run is always redirected into a `dry/` subdirectory of
+   * the base (see `resolveOutDir`).
+   */
   outDir: string;
+  /** The base the run was pointed at, before the dry-run redirect. Reported so
+   *  a reader can see both halves of the decision. */
+  outDirBase: string;
   /** Path to a JSON file of verified provider rates. Without it, cost is unverified. */
   rateFile: string | null;
+}
+
+/**
+ * Keep a mocked run's artifacts away from the live ones (Phase 21 §9, §11).
+ *
+ * `ai:benchmark:dry` used to write `latest.json` and `latest.md` into the same
+ * directory a live run writes them, so running the dry gate overwrote the
+ * committed provider record with a stub report. That is a footgun in the worst
+ * possible place: the overwrite is silent, it succeeds, and the file it
+ * destroys is evidence about real provider behaviour that cannot be
+ * regenerated without spending money. Phase 20 hit it and had to discard the
+ * overwrite by hand before committing.
+ *
+ * The redirect is applied to `AI_BENCH_OUT_DIR` as well as to the default, not
+ * only to the default. An operator who points the harness at their own
+ * directory has the same live record to lose, and "the safety only applies if
+ * you did not configure anything" is not a safety property.
+ *
+ * The live path is deliberately left exactly where it has always been. Moving
+ * it would rewrite where historical evidence lives to make the tree symmetric,
+ * and §61 is explicit that historical benchmark evidence is preserved rather
+ * than tidied.
+ */
+export function resolveOutDir(base: string, dryRun: boolean): string {
+  return dryRun ? path.join(base, "dry") : base;
 }
 
 function num(name: string, fallback: number): number {
@@ -75,6 +108,9 @@ export function loadConfig(): BenchmarkConfig {
   if (openaiModels) models.openai = openaiModels;
 
   const suite = process.env.AI_BENCH_SUITE === "full" ? "full" : "smoke";
+  const dryRun = bool("AI_BENCH_DRY_RUN", false);
+  const outDirBase =
+    process.env.AI_BENCH_OUT_DIR ?? path.join(process.cwd(), "reports", "ai-benchmark");
 
   return {
     providers,
@@ -94,9 +130,10 @@ export function loadConfig(): BenchmarkConfig {
     timeoutMs: num("AI_BENCH_TIMEOUT_MS", 240_000),
     retries: Math.max(0, num("AI_BENCH_RETRIES", 1)),
     suite,
-    dryRun: bool("AI_BENCH_DRY_RUN", false),
+    dryRun,
     judge: bool("AI_BENCH_JUDGE", false),
-    outDir: process.env.AI_BENCH_OUT_DIR ?? path.join(process.cwd(), "reports", "ai-benchmark"),
+    outDirBase,
+    outDir: resolveOutDir(outDirBase, dryRun),
     rateFile: process.env.AI_BENCH_RATE_FILE ?? null,
   };
 }

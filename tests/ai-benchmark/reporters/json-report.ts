@@ -12,6 +12,41 @@ export interface BenchmarkReport {
   commit: string | null;
   suite: string;
   /**
+   * What this artifact IS (Phase 21 §10).
+   *
+   * `dry` means every result came from the deterministic stub and no provider
+   * was contacted; `live` means the harness was pointed at real providers.
+   * It is recorded rather than inferred because the two are indistinguishable
+   * downstream once the numbers are in a table, and a mocked score read as a
+   * measured one is the worst failure mode this file has.
+   *
+   * Note what `live` does NOT assert: that any call succeeded. A live run
+   * whose calls all come back UNAVAILABLE is still mode `live` — read
+   * `execution_modes` for what actually happened.
+   */
+  mode: "live" | "dry";
+  /**
+   * How many calls actually went to a provider over the network.
+   *
+   * Recorded so "0 live calls" is a machine-checkable claim (Phase 21 §11,
+   * §54) rather than something a reader takes on trust from the flag that was
+   * set. For a dry run this must be 0, and
+   * `scripts/verify-benchmark-isolation.sh` fails the gate if it is not.
+   *
+   * Deliberately NOT the request budget's counter. The budget authorises
+   * *executions*, and a stubbed execution consumes budget exactly like a real
+   * one — a full dry run spends 765 of them without opening a socket. Reading
+   * that number as "provider calls" would have this field report 765 network
+   * calls for a run that made none, which is precisely the live-versus-mocked
+   * confusion §10 exists to end.
+   *
+   * So it is summed over executions that were not MOCKED, using each
+   * execution's own `providerCalls` — which already counts the
+   * orchestrator-internal extras (a retry, a cross-provider fallback, the
+   * dual-model reviewer pass), and those are real calls that cost real money.
+   */
+  provider_calls: number;
+  /**
    * Whether every planned call actually ran. A run truncated by a budget
    * ceiling or a cancellation reports fewer scenarios than the suite
    * defines, and its aggregate scores cover only what ran — that must be
@@ -38,6 +73,7 @@ function keyFor(summary: ModelSummary): string {
 export function buildReport(params: {
   runId: string;
   suite: string;
+  mode: BenchmarkReport["mode"];
   plannedCalls: number;
   commit: string | null;
   status: BenchmarkReport["status"];
@@ -62,6 +98,10 @@ export function buildReport(params: {
     timestamp: new Date().toISOString(),
     commit: params.commit,
     suite: params.suite,
+    mode: params.mode,
+    provider_calls: params.results
+      .filter((r) => r.execution.mode !== "MOCKED")
+      .reduce((total, r) => total + (r.execution.providerCalls ?? 0), 0),
     completeness: {
       status: skipped.length > 0 ? "partial" : "complete",
       plannedCalls: params.plannedCalls,

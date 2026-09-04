@@ -28,7 +28,8 @@
     "db:verify:isolation:19": "bash scripts/db-isolation.sh supabase/tests/phase19_project_isolation.sql",
     "db:verify:isolation:20": "bash scripts/db-isolation.sh supabase/tests/phase20_project_isolation.sql",
     "db:verify:isolation:21": "bash scripts/db-isolation.sh supabase/tests/phase21_project_isolation.sql",
-    "db:verify:isolation:all": "bash scripts/db-isolation-all.sh"
+    "db:verify:isolation:all": "bash scripts/db-isolation-all.sh",
+    "db:profile": "bash scripts/db-isolation.sh supabase/tests/phase21_performance.sql"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",

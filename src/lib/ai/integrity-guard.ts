@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ProviderName, ResearchWarning, TaskType } from "./types";
+import { RESEARCH_INTEGRITY_LABELS } from "./research-integrity-guard";
 
 const RESULTS_TASK_TYPES: TaskType[] = ["results_generation", "data_analysis"];
 
@@ -83,12 +84,41 @@ export function isCitationKeyShaped(token: string): boolean {
   return /^[A-Za-z][A-Za-z0-9_-]{2,63}$/.test(token);
 }
 
+const INTEGRITY_LABELS = new Set<string>(RESEARCH_INTEGRITY_LABELS);
+
+/**
+ * Is this bracket token one of the claim labels the system instruction
+ * *requires* the model to write?
+ *
+ * `research-integrity-guard.ts` rule 3 tells every model that "every
+ * non-trivial claim you generate must be labeled with one of: VERIFIED,
+ * SOURCE_REQUIRED, USER_PROVIDED, INFERENCE, or UNVERIFIED". Models comply by
+ * writing them in brackets, beside the citation, which makes them
+ * indistinguishable from a citation key to a grammar that only looks at the
+ * shape of the token — `VERIFIED` starts with a letter and is longer than
+ * three characters, so `isCitationKeyShaped` accepts it.
+ *
+ * Found by the first live benchmark (Phase 22 §22G). Answers that were
+ * otherwise correct — right prevalence, right confidence interval, right
+ * source — came back to the researcher carrying `high` severity warnings that
+ * `"VERIFIED"` and `"INFERENCE"` were citations matching no saved source. The
+ * application asked for the label and then reported it as a fabricated
+ * citation. It could not have been found by the dry benchmark: the stub does
+ * not follow the integrity instructions, because it is not a model.
+ */
+export function isResearchIntegrityLabel(token: string): boolean {
+  return INTEGRITY_LABELS.has(token);
+}
+
 /**
  * Citation keys a response appears to claim. Bracket tokens that look like
- * list numbering are excluded here and handled separately.
+ * list numbering, and the integrity labels the system instruction requires,
+ * are excluded here and handled separately.
  */
 export function extractCitationKeys(text: string): string[] {
-  return extractBracketTokens(text).filter(isCitationKeyShaped);
+  return extractBracketTokens(text).filter(
+    (token) => isCitationKeyShaped(token) && !isResearchIntegrityLabel(token),
+  );
 }
 
 /**
@@ -142,14 +172,22 @@ export async function verifyCitationKeys(
  *  1. Key-shaped tokens (`[smith2024]`) are candidates — warned about when
  *     they resolve to no saved source. This keeps verification strict: an
  *     invented key is still caught.
- *  2. Tokens that are *not* key-shaped (`[1]`) are looked up too, but never
- *     warned about. If a project genuinely stores a source keyed "1", the
- *     reference is real and is honoured — the grammar must not silently
+ *  2. Tokens that are *not* key-shaped (`[1]`), and the integrity labels the
+ *     system instruction requires (`[VERIFIED]`), are looked up too, but
+ *     never warned about. If a project genuinely stores a source keyed "1",
+ *     the reference is real and is honoured — the grammar must not silently
  *     discard a key that exists in the database. If it resolves to nothing,
- *     it is list numbering and is ignored rather than reported.
+ *     it is list numbering or a claim label, and is ignored rather than
+ *     reported.
  *
- * The net effect: numbered lists stop producing false warnings, without
- * loosening what counts as an unverified citation.
+ * Putting the labels in this second class rather than dropping them outright
+ * is deliberate, and it is the same reasoning that put `[1]` here: a project
+ * that really does store a source keyed `UNVERIFIED` still gets its citation
+ * honoured. What changes is only that a label which resolves to nothing stops
+ * being reported as a fabricated citation.
+ *
+ * The net effect: numbered lists and required claim labels stop producing
+ * false warnings, without loosening what counts as an unverified citation.
  */
 export async function verifyCitationsInText(
   supabase: SupabaseClient,
@@ -159,8 +197,8 @@ export async function verifyCitationsInText(
   const tokens = extractBracketTokens(text);
   if (tokens.length === 0) return [];
 
-  const candidates = tokens.filter(isCitationKeyShaped);
-  const ambiguous = tokens.filter((t) => !isCitationKeyShaped(t));
+  const candidates = tokens.filter((t) => isCitationKeyShaped(t) && !isResearchIntegrityLabel(t));
+  const ambiguous = tokens.filter((t) => !isCitationKeyShaped(t) || isResearchIntegrityLabel(t));
 
   // Nothing citation-shaped and nothing that could be a stored key: skip the
   // query entirely rather than round-tripping for a numbered list.

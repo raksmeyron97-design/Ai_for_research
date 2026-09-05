@@ -1,4 +1,28 @@
 /**
+ * The claim labels rule 3 below requires. Exported so that the code which
+ * reads model output shares one definition with the prompt that asks for it.
+ *
+ * They were only in the prompt text until Phase 22, and the first live
+ * benchmark showed what that cost: the model obeyed rule 3, wrote
+ * `[VERIFIED]` and `[INFERENCE]` beside its claims, and the citation
+ * verifier — which treats a bare bracket token as a citation key — told the
+ * researcher those were citations matching no saved source, at `high`
+ * severity. Five of the eight scored executions produced it, so it was the
+ * dominant failure of the run: the application instructing an output format
+ * and then warning about it.
+ *
+ * Anything added here must also be added to rule 3, and vice versa;
+ * `src/lib/ai/__tests__/integrity-guard.test.ts` fails if they drift.
+ */
+export const RESEARCH_INTEGRITY_LABELS = [
+  "VERIFIED",
+  "SOURCE_REQUIRED",
+  "USER_PROVIDED",
+  "INFERENCE",
+  "UNVERIFIED",
+] as const;
+
+/**
  * Injected into every system instruction (Sections 15, 18, 19, 59). This is
  * the one piece of prompt text that is never task-specific and never
  * optional — it is the hard safety boundary for academic integrity.

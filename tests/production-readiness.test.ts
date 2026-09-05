@@ -225,3 +225,24 @@ describe("the benchmark's live record is protected (§11, §54)", () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * Phase 22 §22B. The browser gate refuses to run against a server that is not
+ * this application, and it recognises this application by the document title
+ * Next renders into every page. That marker lives in two files, so it can
+ * drift — and the way it fails when it drifts is the bad way: every browser
+ * run stops with "the page it served is not this application" about the
+ * correct server.
+ */
+describe("the browser gate can still recognise this application (§22B)", () => {
+  it("matches the app title the browser gate looks for to the one the app renders", () => {
+    const layoutTitle = /title:\s*"([^"]+)"/.exec(read("src/app/layout.tsx"))?.[1];
+    const gateTitle = /const APP_TITLE = "([^"]+)"/.exec(read("tests/browser/global-setup.ts"))?.[1];
+
+    expect(layoutTitle, "no title found in src/app/layout.tsx").toBeTruthy();
+    expect(
+      gateTitle,
+      "tests/browser/global-setup.ts no longer declares APP_TITLE",
+    ).toBe(layoutTitle);
+  });
+});

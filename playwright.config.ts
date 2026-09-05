@@ -35,6 +35,30 @@ export const VIEWPORTS = {
   desktop1280: { width: 1280, height: 900 },
 } as const;
 
+/**
+ * The port is configurable, and that is a Phase 22 finding rather than a
+ * convenience (§22B, "port assumptions").
+ *
+ * 3100 was hard-coded in three places — the server command, the readiness
+ * URL, and the default baseURL. On a machine where something else already
+ * held 3100, `reuseExistingServer` pointed the entire browser gate at that
+ * other server. What actually happened here: an unrelated project's
+ * `next dev -p 3100` was running, its `/login` answered 404, and the gate sat
+ * in `waitForURL` until it failed with "Timed out waiting 300000ms from
+ * config.webServer" — five minutes, and a message that names neither the port
+ * nor the squatter.
+ *
+ * The worse version of the same bug is the one that does not fail: had that
+ * server answered 200 on `/login`, all 71 tests would have run against
+ * somebody else's application and reported on this one.
+ *
+ * So: one source of truth for the port, overridable with PLAYWRIGHT_PORT, and
+ * `tests/browser/global-setup.ts` refuses to proceed unless the server on it
+ * actually serves *this* app.
+ */
+const PORT = process.env.PLAYWRIGHT_PORT ?? "3100";
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${PORT}`;
+
 export default defineConfig({
   testDir: "./tests/browser",
   // A build plus a seed is slow enough that a 30s default turns an ordinary
@@ -77,7 +101,7 @@ export default defineConfig({
   reporter: process.env.CI ? "line" : [["list"]],
   globalSetup: "./tests/browser/global-setup.ts",
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3100",
+    baseURL: BASE_URL,
     storageState: "tests/browser/.auth/state.json",
     trace: "retain-on-failure",
   },
@@ -86,8 +110,8 @@ export default defineConfig({
     // `next start` on the production build, not `next dev`: dev-mode layout
     // shifts and overlays are not what ships, and a responsive gate that
     // passes only in dev is worth nothing.
-    command: "npm run build && npx next start --port 3100 --hostname 127.0.0.1",
-    url: "http://127.0.0.1:3100/login",
+    command: `npm run build && npx next start --port ${PORT} --hostname 127.0.0.1`,
+    url: `${BASE_URL}/login`,
     reuseExistingServer: !process.env.CI,
     timeout: 300_000,
     stdout: "pipe",

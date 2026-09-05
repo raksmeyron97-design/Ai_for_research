@@ -75,6 +75,29 @@ describe("grounding evaluator", () => {
     expect(unsupported.join(" ")).toContain("47.3");
   });
 
+  // Phase 22 §22G. Found as a false positive in the first live run:
+  // `struct-quality-check` puts the material under review in the prompt
+  // rather than in a retrieved corpus, so the model quoting the researcher's
+  // own "convenience sample of 100 women" back at them was scored as an
+  // unsupported numeric claim, and the scenario as a GROUNDING_FAILURE.
+  it("does not flag a number the request itself supplied", () => {
+    const { unsupported } = evaluateGrounding(
+      scenario({ input: "Review this study: a convenience sample of 512 women at one centre." }),
+      "The convenience sample of 512 women is not justified by a power calculation.",
+    );
+    expect(unsupported).toEqual([]);
+  });
+
+  it("still flags a fabricated number in a scenario whose prompt carries figures", () => {
+    // The relaxation must not become a way for an invented figure to pass
+    // simply because the prompt happened to contain some other number.
+    const { unsupported } = evaluateGrounding(
+      scenario({ input: "Review this study: a convenience sample of 512 women at one centre." }),
+      "The sample of 512 women yielded a response rate of 87.4%.",
+    );
+    expect(unsupported.join(" ")).toContain("87.4");
+  });
+
   it("does not flag years or small ordinals as unsupported claims", () => {
     const { unsupported } = evaluateGrounding(scenario(), "In 2024, the first of 3 findings was reported.");
     expect(unsupported).toEqual([]);

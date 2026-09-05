@@ -23,58 +23,102 @@ readers of this repository:
 
 ## Status of the committed record, as of Phase 22
 
-**A live run has completed. It is a smoke run, and its quality scores are not
-usable as a measurement.** Both halves of that matter.
+**Two live smoke runs have completed. AI quality is still NOT MEASURED.**
+Both halves matter, and the second is the one people get wrong.
 
-`latest.json` is `run_2026-09-05T15-31-53-902Z_db0df567`: suite `smoke`,
-`mode: "live"`, 20 provider calls, `completeness: complete`. Its execution
-modes are `LIVE: 7`, `DEGRADED: 1`, `UNAVAILABLE: 4`. That is the first time
-in this project's history that any scenario produced a scored live result, and
-it is category 2 in the table above — a wiring check — not category 3.
+`latest.json` is `run_2026-09-05T16-18-26-795Z_6a74f04f`: suite `smoke`,
+`mode: "live"`, 20 provider calls, `completeness: complete`, well inside its
+ceilings. Execution modes `LIVE: 7`, `DEGRADED: 1`, `UNAVAILABLE: 4`. That is
+category 2 in the table above — a wiring check over three scenarios — and it
+is not category 3. Three scenarios at one repetition describe that run, not a
+model.
 
-What it establishes:
+What the two runs established:
 
-* **Gemini is reachable and billable.** Seven scored executions, cost priced
-  from `src/lib/ai/pricing.ts` at $0.034 for the run.
-* **OpenAI is still blocked, and the blocker is named in the artifact:**
-  `429 You have no credits remaining.` Every OpenAI execution is UNAVAILABLE.
-  No OpenAI quality number exists, and none may be inferred.
-* **Cross-provider fallback works under a real outage.** The one `DEGRADED`
-  execution is the routed group failing over from OpenAI to Gemini and
-  returning an answer. That is production recovery behaviour, observed rather
-  than asserted.
+* **Gemini is reachable and billable.** Seven scored executions per run, cost
+  priced from `src/lib/ai/pricing.ts`. $0.034 and $0.036 respectively.
+* **OpenAI is blocked, and the artifact names the blocker:** `429 You have no
+  credits remaining.` Every OpenAI execution is UNAVAILABLE. **No OpenAI
+  quality figure exists, and none may be inferred.** There is therefore no
+  provider comparison, and nothing in this repository supports one.
+* **Cross-provider fallback works under a real outage.** The single `DEGRADED`
+  execution in each run is the routed group failing over from OpenAI to Gemini
+  and still returning an answer — production recovery observed rather than
+  asserted.
+* **The production path finds bugs a stub cannot.** See below.
 
-Why the scores may not be quoted: the run's own citation metrics are
-corrupted by a bug it found. `research-integrity-guard.ts` rule 3 requires the
-model to label claims `[VERIFIED]`, `[INFERENCE]` and so on; the citation
-verifier read those labels as citation keys, and reported them to the
-researcher as `high` severity fabricated citations. Five of the eight scored
-executions carry it. It drove `fabricated_citation_rate` to 1.0, halved
-`citation_precision`, and produced the A/B line claiming variant B "changed
-citation correctness by -50.0 points". The underlying answers were correct —
-right prevalence, right confidence interval, right source.
+### Why there are two runs, and why the first one's numbers are wrong
 
-The bug is fixed in `src/lib/ai/integrity-guard.ts` as of Phase 22. **This
-artifact is preserved as it was written (§61) and is not rescored**, because
-it is the evidence that the bug existed in production. A re-run after the fix
-would be a different run and gets a different file.
+The first live run in this project's history
+(`archive/run_2026-09-05T15-31-53-902Z_db0df567.json`) found a production bug
+in the thing it was measuring.
 
-So, precisely:
+`research-integrity-guard.ts` rule 3 requires the model to label claims
+`[VERIFIED]`, `[INFERENCE]`, `[SOURCE_REQUIRED]` and so on. Gemini complied.
+`extractCitationKeys` judges a bracket token by its shape, so it read those
+labels as citation keys, and `verifyCitationsInText` told the researcher — at
+`high` severity — that `"VERIFIED"` was a citation matching no saved source.
+Five of eight scored executions carried it, on answers that were otherwise
+correct: right prevalence, right confidence interval, right source.
+
+It also corrupted that run's own metrics: `fabricated_citation_rate` 1.0,
+`citation_precision` 0.5, and a recommendation claiming variant B "changed
+citation correctness by -50.0 points".
+
+The fix is in `src/lib/ai/integrity-guard.ts`. The second run, on the fixed
+code, is the same three scenarios against the same models:
+
+| | first run | second run |
+| --- | --- | --- |
+| `fabricated_citation_rate` | 1.0 | **0** |
+| `citation_precision` | 0.5 | **1.0** |
+| production warnings on scored executions | 8 | **0** |
+| overall score range | 50.0 – 66.9 | **74.9 – 100** |
+
+That difference is the bug being removed, not a model improving. Neither
+column is a quality measurement.
+
+The first run is preserved unrescored (§61): it is the evidence that the bug
+reached production.
+
+### What is still open in the current run
+
+* `gemini-3.1-pro-preview` returned JSON that does not satisfy the
+  `quality_check` schema — `PARSING_FAILURE`, overall 11.1. In production the
+  caller discards such a response and shows placeholder scores. This is the
+  advanced/reviewer-tier Gemini model.
+* One `rag-c3` variant answered a question the evidence does not support
+  without flagging that it does not — `HALLUCINATION`, false confidence. The
+  other variant abstained correctly.
+* One `GROUNDING_FAILURE` on `struct-quality-check` is a **false positive**
+  and was fixed after this run was written: the evaluator only accepted
+  numbers from the retrieved corpus, and this scenario's material under review
+  is in the prompt, so the model quoting the researcher's own "100 women" back
+  was scored as an unsupported claim. The fix is in
+  `tests/ai-benchmark/evaluators/grounding.ts`; this artifact predates it, so
+  its `structured_output` score for `gemini-3.6-flash` is understated.
+
+### Precisely
 
 ```
-LIVE SMOKE      = COMPLETED (2026-09-05), Gemini only
+LIVE SMOKE      = COMPLETED (2026-09-05), Gemini only, twice
 LIVE BENCHMARK  = NOT MEASURED
 AI QUALITY      = NOT MEASURED
-OPENAI          = BLOCKED (no credits)
+PROVIDER COMPARISON = NOT POSSIBLE (OpenAI has no credits)
+OPENAI          = BLOCKED (429, no credits remaining)
 ```
 
-### The record this replaced
+### The records these replaced
 
-`archive/run_2026-09-01T11-19-35-444Z_a2266530.json` is the Phase 16B attempt:
-`"execution_modes": {"UNAVAILABLE": 12}` — a credential probe that succeeded
-and twelve scenarios that all failed to produce a result, on provider billing.
+`archive/` holds every live report a later live run displaced:
 
-It is archived rather than overwritten because until Phase 22 a live run
+* `run_2026-09-01T11-19-35-444Z_a2266530.json` — the Phase 16B attempt,
+  `{"UNAVAILABLE": 12}`: a credential probe that succeeded and twelve
+  scenarios that produced no result, on provider billing.
+* `run_2026-09-05T15-31-53-902Z_db0df567.json` — the first scored live run,
+  described above.
+
+They are archived rather than overwritten because until Phase 22 a live run
 destroyed its predecessor: `writeReport` wrote `latest.json` in place and its
 per-run copy went to `raw/`, which is gitignored. `archive/` is committed, and
 `archiveExistingLiveReport` fills it before any live write.

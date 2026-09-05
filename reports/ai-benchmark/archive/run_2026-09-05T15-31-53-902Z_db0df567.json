@@ -2,9 +2,9 @@
   "phase": 16,
   "status": "NOT READY",
   "benchmark_version": "16.0.0",
-  "run_id": "run_2026-09-05T16-18-26-795Z_6a74f04f",
-  "timestamp": "2026-09-05T16:19:43.644Z",
-  "commit": "c707620",
+  "run_id": "run_2026-09-05T15-31-53-902Z_db0df567",
+  "timestamp": "2026-09-05T15:33:22.281Z",
+  "commit": "a7797f9",
   "suite": "smoke",
   "mode": "live",
   "provider_calls": 20,
@@ -217,73 +217,73 @@
     }
   },
   "overall_scores": {
-    "gemini:gemini:gemini-3.6-flash:variantB": 100,
-    "routed:gemini:gemini-3.6-flash:variantB": 99.69711538461537,
-    "gemini:gemini:gemini-3.6-flash:variantA": 85.70467032967035,
-    "routed:gemini:gemini-3.6-flash:variantA": 74.94043576104747,
-    "routed:gemini:gemini-3.1-pro-preview:variantA": 11.111111111111112,
+    "gemini:gemini:gemini-3.6-flash:variantA": 66.86345615169144,
+    "routed:gemini:gemini-3.6-flash:variantB": 64.61538461538461,
+    "gemini:gemini:gemini-3.6-flash:variantB": 63.913574660633486,
+    "routed:gemini:gemini-3.6-flash:variantA": 53.2718355301987,
+    "routed:gemini:gemini-3.1-pro-preview:variantA": 50.00000000000001,
     "openai:openai:gpt-5.4-mini:variantA": null,
     "openai:openai:gpt-5.4-mini:variantB": null,
     "openai:openai:gpt-5.6:variantA": null
   },
   "category_scores": {
-    "gemini:gemini:gemini-3.6-flash:variantB": {
-      "rag_grounding": 100
-    },
-    "routed:gemini:gemini-3.6-flash:variantB": {
-      "rag_grounding": 99.69711538461537
-    },
     "gemini:gemini:gemini-3.6-flash:variantA": {
-      "rag_grounding": 99.97115384615385,
-      "hallucination": 100.00000000000001,
+      "rag_grounding": 99.44751131221719,
+      "hallucination": 44.00000000000001,
       "structured_output": 57.14285714285714
     },
+    "routed:gemini:gemini-3.6-flash:variantB": {
+      "rag_grounding": 64.61538461538461
+    },
+    "gemini:gemini:gemini-3.6-flash:variantB": {
+      "rag_grounding": 63.913574660633486
+    },
     "routed:gemini:gemini-3.6-flash:variantA": {
-      "rag_grounding": 99.9423076923077,
-      "hallucination": 49.93856382978724
+      "rag_grounding": 64.22714932126696,
+      "hallucination": 42.316521739130444
     },
     "routed:gemini:gemini-3.1-pro-preview:variantA": {
-      "structured_output": 11.111111111111112
+      "structured_output": 50.00000000000001
     },
     "openai:openai:gpt-5.4-mini:variantA": {},
     "openai:openai:gpt-5.4-mini:variantB": {},
     "openai:openai:gpt-5.6:variantA": {}
   },
   "latency": {
-    "gemini:gemini:gemini-3.6-flash:variantB": {
-      "n": 1,
-      "min": 5696,
-      "median": 5696,
-      "p95": 5696,
-      "max": 5696
+    "gemini:gemini:gemini-3.6-flash:variantA": {
+      "n": 3,
+      "min": 5990,
+      "median": 8301,
+      "p95": 8411,
+      "max": 8411
     },
     "routed:gemini:gemini-3.6-flash:variantB": {
       "n": 1,
-      "min": 7275,
-      "median": 7275,
-      "p95": 7275,
-      "max": 7275
+      "min": 8258,
+      "median": 8258,
+      "p95": 8258,
+      "max": 8258
     },
-    "gemini:gemini:gemini-3.6-flash:variantA": {
-      "n": 3,
-      "min": 5294,
-      "median": 9456,
-      "p95": 9569,
-      "max": 9569
+    "gemini:gemini:gemini-3.6-flash:variantB": {
+      "n": 1,
+      "min": 7442,
+      "median": 7442,
+      "p95": 7442,
+      "max": 7442
     },
     "routed:gemini:gemini-3.6-flash:variantA": {
       "n": 2,
-      "min": 7506,
-      "median": 7763,
-      "p95": 8020,
-      "max": 8020
+      "min": 7475,
+      "median": 8258,
+      "p95": 9041,
+      "max": 9041
     },
     "routed:gemini:gemini-3.1-pro-preview:variantA": {
       "n": 1,
-      "min": 34065,
-      "median": 34065,
-      "p95": 34065,
-      "max": 34065
+      "min": 34833,
+      "median": 34833,
+      "p95": 34833,
+      "max": 34833
     },
     "openai:openai:gpt-5.4-mini:variantA": {
       "n": 0,
@@ -308,37 +308,37 @@
     }
   },
   "tokens": {
-    "gemini:gemini:gemini-3.6-flash:variantB": {
-      "medianInput": 713,
-      "medianOutput": 176,
-      "medianTotal": 889,
-      "medianReasoning": null,
-      "medianRetrievedContext": 248,
-      "providerReported": 1,
-      "estimated": 0
-    },
-    "routed:gemini:gemini-3.6-flash:variantB": {
-      "medianInput": 713,
-      "medianOutput": 197,
-      "medianTotal": 910,
-      "medianReasoning": null,
-      "medianRetrievedContext": 248,
-      "providerReported": 1,
-      "estimated": 0
-    },
     "gemini:gemini:gemini-3.6-flash:variantA": {
       "medianInput": 713,
-      "medianOutput": 376,
-      "medianTotal": 1223,
+      "medianOutput": 330,
+      "medianTotal": 974,
       "medianReasoning": null,
       "medianRetrievedContext": 248,
       "providerReported": 3,
       "estimated": 0
     },
+    "routed:gemini:gemini-3.6-flash:variantB": {
+      "medianInput": 713,
+      "medianOutput": 170,
+      "medianTotal": 883,
+      "medianReasoning": null,
+      "medianRetrievedContext": 248,
+      "providerReported": 1,
+      "estimated": 0
+    },
+    "gemini:gemini:gemini-3.6-flash:variantB": {
+      "medianInput": 713,
+      "medianOutput": 217,
+      "medianTotal": 930,
+      "medianReasoning": null,
+      "medianRetrievedContext": 248,
+      "providerReported": 1,
+      "estimated": 0
+    },
     "routed:gemini:gemini-3.6-flash:variantA": {
       "medianInput": 793,
-      "medianOutput": 281.5,
-      "medianTotal": 1074.5,
+      "medianOutput": 358.5,
+      "medianTotal": 1151.5,
       "medianReasoning": null,
       "medianRetrievedContext": 326.5,
       "providerReported": 2,
@@ -346,8 +346,8 @@
     },
     "routed:gemini:gemini-3.1-pro-preview:variantA": {
       "medianInput": 644,
-      "medianOutput": 67,
-      "medianTotal": 711,
+      "medianOutput": 70,
+      "medianTotal": 714,
       "medianReasoning": null,
       "medianRetrievedContext": 0,
       "providerReported": 1,
@@ -382,28 +382,28 @@
     }
   },
   "cost": {
-    "gemini:gemini:gemini-3.6-flash:variantB": {
-      "totalUsd": 0.0038422499999999997,
-      "perRequestUsd": 0.0038422499999999997,
-      "perSuccessUsd": 0.0038422499999999997,
+    "gemini:gemini:gemini-3.6-flash:variantA": {
+      "totalUsd": 0.015179999999999999,
+      "perRequestUsd": 0.005059999999999999,
+      "perSuccessUsd": 0.005059999999999999,
       "rateSource": "verified_app_pricing"
     },
     "routed:gemini:gemini-3.6-flash:variantB": {
-      "totalUsd": 0.005376000000000001,
-      "perRequestUsd": 0.005376000000000001,
-      "perSuccessUsd": 0.005376000000000001,
+      "totalUsd": 0.004011,
+      "perRequestUsd": 0.004011,
+      "perSuccessUsd": 0.004011,
       "rateSource": "verified_app_pricing"
     },
-    "gemini:gemini:gemini-3.6-flash:variantA": {
-      "totalUsd": 0.01629375,
-      "perRequestUsd": 0.0054312499999999994,
-      "perSuccessUsd": 0.0054312499999999994,
+    "gemini:gemini:gemini-3.6-flash:variantB": {
+      "totalUsd": 0.00422475,
+      "perRequestUsd": 0.00422475,
+      "perSuccessUsd": 0.00422475,
       "rateSource": "verified_app_pricing"
     },
     "routed:gemini:gemini-3.6-flash:variantA": {
-      "totalUsd": 0.01035075,
-      "perRequestUsd": 0.005175375,
-      "perSuccessUsd": 0.005175375,
+      "totalUsd": 0.010470750000000001,
+      "perRequestUsd": 0.0052353750000000004,
+      "perSuccessUsd": 0.0052353750000000004,
       "rateSource": "verified_app_pricing"
     },
     "routed:gemini:gemini-3.1-pro-preview:variantA": {
@@ -432,55 +432,17 @@
     }
   },
   "rag": {
-    "gemini:gemini:gemini-3.6-flash:variantB": {
-      "citation_precision": 1,
-      "citation_recall": 1,
-      "fabricated_citation_rate": 0,
-      "unsupported_claim_rate": 0,
-      "hallucination_rate": null,
-      "abstention_accuracy": null,
-      "by_answerability_class": {
-        "class_1": {
-          "n": 1,
-          "overall": 100,
-          "groundedness": 100,
-          "citationPrecision": 1,
-          "citationRecall": 1,
-          "abstentionAccuracy": null,
-          "unsupportedClaimRate": 0
-        }
-      }
-    },
-    "routed:gemini:gemini-3.6-flash:variantB": {
-      "citation_precision": 1,
-      "citation_recall": 1,
-      "fabricated_citation_rate": 0,
-      "unsupported_claim_rate": 0,
-      "hallucination_rate": null,
-      "abstention_accuracy": null,
-      "by_answerability_class": {
-        "class_1": {
-          "n": 1,
-          "overall": 99.69711538461537,
-          "groundedness": 100,
-          "citationPrecision": 1,
-          "citationRecall": 1,
-          "abstentionAccuracy": null,
-          "unsupportedClaimRate": 0
-        }
-      }
-    },
     "gemini:gemini:gemini-3.6-flash:variantA": {
       "citation_precision": 1,
       "citation_recall": 1,
-      "fabricated_citation_rate": 0,
+      "fabricated_citation_rate": 0.3333333333333333,
       "unsupported_claim_rate": 0.3333333333333333,
-      "hallucination_rate": 0,
+      "hallucination_rate": 1,
       "abstention_accuracy": 1,
       "by_answerability_class": {
         "class_1": {
           "n": 1,
-          "overall": 99.97115384615385,
+          "overall": 99.44751131221719,
           "groundedness": 100,
           "citationPrecision": 1,
           "citationRecall": 1,
@@ -489,7 +451,7 @@
         },
         "class_3": {
           "n": 1,
-          "overall": 100.00000000000001,
+          "overall": 44.00000000000001,
           "groundedness": 100,
           "citationPrecision": null,
           "citationRecall": null,
@@ -498,30 +460,68 @@
         }
       }
     },
-    "routed:gemini:gemini-3.6-flash:variantA": {
-      "citation_precision": 1,
+    "routed:gemini:gemini-3.6-flash:variantB": {
+      "citation_precision": 0.5,
       "citation_recall": 1,
-      "fabricated_citation_rate": 0,
+      "fabricated_citation_rate": 1,
       "unsupported_claim_rate": 0,
-      "hallucination_rate": 1,
-      "abstention_accuracy": 0,
+      "hallucination_rate": null,
+      "abstention_accuracy": null,
       "by_answerability_class": {
         "class_1": {
           "n": 1,
-          "overall": 99.9423076923077,
+          "overall": 64.61538461538461,
           "groundedness": 100,
-          "citationPrecision": 1,
+          "citationPrecision": 0.5,
+          "citationRecall": 1,
+          "abstentionAccuracy": null,
+          "unsupportedClaimRate": 0
+        }
+      }
+    },
+    "gemini:gemini:gemini-3.6-flash:variantB": {
+      "citation_precision": 0.5,
+      "citation_recall": 1,
+      "fabricated_citation_rate": 1,
+      "unsupported_claim_rate": 0,
+      "hallucination_rate": null,
+      "abstention_accuracy": null,
+      "by_answerability_class": {
+        "class_1": {
+          "n": 1,
+          "overall": 63.913574660633486,
+          "groundedness": 100,
+          "citationPrecision": 0.5,
+          "citationRecall": 1,
+          "abstentionAccuracy": null,
+          "unsupportedClaimRate": 0
+        }
+      }
+    },
+    "routed:gemini:gemini-3.6-flash:variantA": {
+      "citation_precision": 0.5,
+      "citation_recall": 1,
+      "fabricated_citation_rate": 1,
+      "unsupported_claim_rate": 0,
+      "hallucination_rate": 1,
+      "abstention_accuracy": 1,
+      "by_answerability_class": {
+        "class_1": {
+          "n": 1,
+          "overall": 64.22714932126696,
+          "groundedness": 100,
+          "citationPrecision": 0.5,
           "citationRecall": 1,
           "abstentionAccuracy": null,
           "unsupportedClaimRate": 0
         },
         "class_3": {
           "n": 1,
-          "overall": 49.93856382978724,
+          "overall": 42.316521739130444,
           "groundedness": 100,
           "citationPrecision": null,
           "citationRecall": null,
-          "abstentionAccuracy": 0,
+          "abstentionAccuracy": 1,
           "unsupportedClaimRate": 0
         }
       }
@@ -565,15 +565,27 @@
   },
   "failures": [
     {
+      "scenarioId": "rag-c1-prevalence-single",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "failureType": "HALLUCINATION",
+      "severity": "critical",
+      "reproducible": true,
+      "probableCause": "fabricated citation keys: VERIFIED",
+      "recommendedFix": "Fabricated citation keys reached the output. verifyCitationKeys() would flag these as warnings post-hoc, but nothing blocks them — consider refusing to render unverified keys in the UI.",
+      "observed": "Based on the provided document excerpt [sok2024antenatal], the findings regarding prevalence and sample characteristics are as follows:\n\n* **Prevalence**: The prevalence of probable antenatal depression among the surveyed population was **21.4%** (95% CI 18.2–24.9) [VERIFIED].\n* **Sample**: The measurement was conducted in a sample of **612 pregnant women in their second and third trimesters** who were attending four urban health centres [VERIFIED].\n\n### Additional Context on Methodology\nThe data were collected as part of a facility-based cross-sectional study (ការសិក្សាបែបកាត់ទទឹង [Cross-sect",
+      "expected": "States 21.4% (optionally the CI), identifies the sample as pregnant women attending urban health centres, and cites the source."
+    },
+    {
       "scenarioId": "rag-c3-cost-effectiveness",
       "provider": "gemini",
       "model": "gemini-3.6-flash",
       "failureType": "HALLUCINATION",
       "severity": "critical",
-      "reproducible": false,
-      "probableCause": "answered without flagging that the evidence does not support it (false confidence) | produced forbidden content: cost per case | $ | cost-effectiveness ratio",
-      "recommendedFix": "Strengthen the abstention/uncertainty rule in research-integrity-guard.ts and verify with the Class 3 scenarios.",
-      "observed": "Based on the provided document excerpts, neither study contains data or analysis regarding the cost-effectiveness or financial cost per case detected for antenatal depression screening [VERIFIED]. \n\nThe included sources address epidemiological parameters and symptom trajectories rather than economic evaluations:\n\n* **Sok et al. (2024) [sok2024antenatal]:** A facility-based cross-sectional study (*ការសិក្សាបែបកាត់ទទឹង*) focused on determining the prevalence of probable antenatal depression (21.4%) and identifying associated psychosocial factors (unplanned pregnancy and low perceived partner sup",
+      "reproducible": true,
+      "probableCause": "produced forbidden content: cost per case",
+      "recommendedFix": "Fabricated citation keys reached the output. verifyCitationKeys() would flag these as warnings post-hoc, but nothing blocks them — consider refusing to render unverified keys in the UI.",
+      "observed": "Based on the provided document excerpts, there is no data or information regarding the cost-effectiveness of antenatal depression screening or the cost per case detected [VERIFIED]. \n\nThe provided sources focus exclusively on prevalence, associated psychosocial factors, and symptom trajectories:\n\n1. **Sok et al. (2024) [sok2024antenatal]** examines the prevalence of probable antenatal depression (21.4%) and its associated factors (unplanned pregnancy, aOR 1.92; low perceived partner support, aOR 2.34) among 612 pregnant women using a 10-item screening scale in a cross-sectional design [USER_PR",
       "expected": "States plainly that the provided sources contain no cost or economic data, and does not produce a figure."
     },
     {
@@ -583,9 +595,9 @@
       "failureType": "GROUNDING_FAILURE",
       "severity": "high",
       "reproducible": false,
-      "probableCause": "1/1 numeric claims not traceable to the provided evidence | 100 (in: \"\"message\": \"Using convenience sampling of 100 women at a single health centre creates high risk of selection bias and se\")",
+      "probableCause": "1/1 numeric claims not traceable to the provided evidence | 100 (in: \"{\"scores\":{\"methodology\":45,\"evidence\":30,\"alignment\":50,\"writing\":60,\"references\":20,\"dataIntegrity\":50,\"overall\":42},\"\")",
       "recommendedFix": "Numbers not present in the retrieved context reached the answer; tighten the no-new-numbers rule per task prompt.",
-      "observed": "{\n  \"scores\": {\n    \"methodology\": 45,\n    \"evidence\": 30,\n    \"alignment\": 50,\n    \"writing\": 60,\n    \"references\": 0,\n    \"dataIntegrity\": 50,\n    \"overall\": 40\n  },\n  \"issues\": [\n    {\n      \"severity\": \"critical\",\n      \"category\": \"Alignment & Measurement\",\n      \"section\": \"Instrument\",\n      \"message\": \"The research objective requires examining the association between social support and antenatal depression, but the instrument section only lists a depression screening scale and omits any social support scale.\",\n      \"recommendation\": \"Incorporate a validated measurement tool for percei",
+      "observed": "{\"scores\":{\"methodology\":45,\"evidence\":30,\"alignment\":50,\"writing\":60,\"references\":20,\"dataIntegrity\":50,\"overall\":42},\"issues\":[{\"severity\":\"critical\",\"category\":\"Alignment\",\"section\":\"Instrument\",\"message\":\"The second objective requires examining the association with social support, but no instrument or scale for measuring social support is specified in the protocol.\",\"recommendation\":\"Integrate a validated social support measurement tool, such as the Multidimensional Scale of Perceived Social Support (MSPSS), alongside the depression screening tool.\"},{\"severity\":\"high\",\"category\":\"Methodol",
       "expected": "Returns schema-valid JSON with all seven scores and issues that name real problems (no social-support instrument, convenience sampling, no sample-size justification)."
     },
     {
@@ -595,9 +607,9 @@
       "failureType": "PARSING_FAILURE",
       "severity": "high",
       "reproducible": false,
-      "probableCause": "missing required concepts: social support | response was not valid JSON for the quality_check schema",
+      "probableCause": "response was not valid JSON for the quality_check schema",
       "recommendedFix": "Response did not satisfy the production schema; the caller discards it and shows placeholder scores.",
-      "observed": "{\"scores\": {\"methodology\": 40, \"evidence\": 50, \"alignment\": 60, \"writing\": 70, \"references\": 50, \"dataIntegrity\": 50, \"overall\": 53}, \"issues\": [{\"severity\": \"informational\", \"category",
+      "observed": "{\"scores\":{\"methodology\":40,\"evidence\":30,\"alignment\":50,\"writing\":50,\"references\":0,\"dataIntegrity\":40,\"overall\":35},\"issues\":[{\"severity\":\"critical\",\"category\":\"Alignment\",\"section\":\"Instrument\",\"message\":\"Missing measurement tool for the social support variable. The objectives state an intention",
       "expected": "Returns schema-valid JSON with all seven scores and issues that name real problems (no social-support instrument, convenience sampling, no sample-size justification)."
     },
     {
@@ -638,10 +650,10 @@
     }
   ],
   "recommendations": [
-    "Highest overall score: gemini/gemini-3.6-flash (100.0).",
+    "Highest overall score: gemini/gemini-3.6-flash (66.9).",
     "Best grounding for RAG/citation work: gemini/gemini-3.6-flash.",
     "Best quality per 1K tokens (high-volume/low-cost tier): gemini/gemini-3.6-flash.",
-    "Prompt/context A/B: variant B (citation-keyed context + citation contract) changed citation correctness by 0.0 points. This does not yet justify a production prompt change."
+    "Prompt/context A/B: variant B (citation-keyed context + citation contract) changed citation correctness by -50.0 points. This does not yet justify a production prompt change."
   ],
   "caveats": [
     "**No cost figure for gemini-3.1-pro-preview.** Neither `src/lib/ai/pricing.ts` nor any supplied rate file prices these models, so they contribute nothing to the cost totals rather than contributing a guess.",

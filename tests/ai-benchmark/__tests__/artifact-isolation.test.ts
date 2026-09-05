@@ -3,6 +3,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { loadConfig, resolveOutDir } from "../config";
+import { archiveExistingLiveReport, writeReport } from "../reporters/json-report";
+import type { BenchmarkReport } from "../reporters/json-report";
 
 /**
  * The dry run must not be able to destroy the live record (Phase 21 §9, §11).
@@ -82,5 +84,80 @@ describe("benchmark artifact isolation", () => {
     } finally {
       fs.rmSync(base, { recursive: true, force: true });
     }
+  });
+});
+
+/**
+ * Phase 22 §22D: a live run must not destroy the live run before it.
+ *
+ * Phase 21 proved a *dry* run cannot damage the live record. It left the
+ * other half open: `writeReport` writes `latest.json` in place, and the
+ * per-run copy beside it lands in `raw/`, which `.gitignore` excludes — so
+ * the only committed trace of a live run was `latest.json`, and the next live
+ * run overwrote it.
+ *
+ * The evidence this protects is real and unrepeatable:
+ * `reports/ai-benchmark/latest.json` records the Phase 16B attempt, the
+ * README describes it, and it cannot be regenerated because it describes a
+ * provider state that no longer obtains.
+ */
+describe("historical live evidence survives a new live run", () => {
+  const report = (runId: string, mode: "live" | "dry"): BenchmarkReport =>
+    ({ run_id: runId, mode, status: "NOT READY" }) as unknown as BenchmarkReport;
+
+  it("archives the report a live run replaces, under the run id it holds", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bench-archive-"));
+
+    const historical = report("run_2026-09-01_the-only-copy", "live");
+    fs.writeFileSync(path.join(dir, "latest.json"), `${JSON.stringify(historical, null, 2)}\n`);
+    fs.writeFileSync(path.join(dir, "latest.md"), "# the only copy\n");
+    const before = fs.readFileSync(path.join(dir, "latest.json"), "utf8");
+
+    writeReport(dir, "run_2026-09-05_new", report("run_2026-09-05_new", "live"), []);
+
+    // The new run is in place...
+    expect(JSON.parse(fs.readFileSync(path.join(dir, "latest.json"), "utf8")).run_id).toBe("run_2026-09-05_new");
+    // ...and the one it replaced is preserved byte-for-byte, named for itself.
+    const archived = path.join(dir, "archive", "run_2026-09-01_the-only-copy.json");
+    expect(fs.existsSync(archived), "the previous live report was not archived").toBe(true);
+    expect(fs.readFileSync(archived, "utf8")).toBe(before);
+    expect(fs.readFileSync(path.join(dir, "archive", "run_2026-09-01_the-only-copy.md"), "utf8")).toBe(
+      "# the only copy\n",
+    );
+  });
+
+  it("does not archive a dry run, whose output is gitignored and regenerable", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bench-archive-dry-"));
+    fs.writeFileSync(path.join(dir, "latest.json"), `${JSON.stringify(report("run_old", "dry"), null, 2)}\n`);
+
+    writeReport(dir, "run_new", report("run_new", "dry"), []);
+
+    expect(fs.existsSync(path.join(dir, "archive"))).toBe(false);
+  });
+
+  it("preserves a report too malformed to parse, rather than losing it", () => {
+    // Losing evidence because it will not parse is the worst version of this
+    // bug: the file is still the only record of whatever happened.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bench-archive-bad-"));
+    fs.writeFileSync(path.join(dir, "latest.json"), "{ this is not json");
+
+    archiveExistingLiveReport(dir);
+
+    expect(fs.readFileSync(path.join(dir, "archive", "unparseable.json"), "utf8")).toBe("{ this is not json");
+  });
+
+  it("is idempotent, so re-archiving never overwrites an archived report", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bench-archive-idem-"));
+    fs.writeFileSync(path.join(dir, "latest.json"), `${JSON.stringify(report("run_a", "live"), null, 2)}\n`);
+
+    archiveExistingLiveReport(dir);
+    const first = fs.readFileSync(path.join(dir, "archive", "run_a.json"), "utf8");
+
+    // A second live run whose predecessor shares a run id must not clobber
+    // the copy already held.
+    fs.writeFileSync(path.join(dir, "latest.json"), `${JSON.stringify({ run_id: "run_a", tampered: true }, null, 2)}\n`);
+    archiveExistingLiveReport(dir);
+
+    expect(fs.readFileSync(path.join(dir, "archive", "run_a.json"), "utf8")).toBe(first);
   });
 });

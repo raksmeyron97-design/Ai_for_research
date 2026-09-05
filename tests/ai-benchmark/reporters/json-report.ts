@@ -136,12 +136,69 @@ export function buildReport(params: {
 }
 
 /**
+ * Preserve the live report a new live run is about to replace (Phase 22 §22D,
+ * Phase 21 §61).
+ *
+ * Phase 21 stopped a dry run from overwriting the live record. It did not
+ * stop a *live* run from overwriting the previous one, and that is the same
+ * loss: `writeReport` writes `latest.json` in place, and the per-run copy it
+ * keeps beside it goes to `raw/`, which `.gitignore` excludes. So the only
+ * committed trace of any live run was `latest.json`, and the next live run
+ * destroyed it.
+ *
+ * The file at risk is not hypothetical. `reports/ai-benchmark/latest.json`
+ * is the record of the Phase 16B attempt — a successful credential probe and
+ * twelve scenarios that all came back UNAVAILABLE. `reports/ai-benchmark/README.md`
+ * describes it, `tests/production-readiness.test.ts` asserts against it, and
+ * it cannot be regenerated: it is evidence of a provider state that no longer
+ * obtains.
+ *
+ * Archiving is committed output, keyed by the run id inside the file it is
+ * preserving rather than by the time it was archived, so re-running the
+ * archive step is idempotent and the name says which run it holds.
+ *
+ * Dry runs are excluded deliberately. `dry/` is gitignored and every byte of
+ * it is regenerable by re-running the gate, so archiving it would accumulate
+ * stub reports to no purpose.
+ */
+export function archiveExistingLiveReport(outDir: string): string | null {
+  const current = path.join(outDir, "latest.json");
+  if (!fs.existsSync(current)) return null;
+
+  let runId: string;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(current, "utf8")) as { run_id?: string };
+    runId = parsed.run_id ?? "unidentified";
+  } catch {
+    // A report that will not parse is still evidence, and losing it because
+    // it is malformed would be the worst version of this bug.
+    runId = "unparseable";
+  }
+
+  const archiveDir = path.join(outDir, "archive");
+  fs.mkdirSync(archiveDir, { recursive: true });
+
+  const target = path.join(archiveDir, `${runId}.json`);
+  if (!fs.existsSync(target)) fs.copyFileSync(current, target);
+
+  const currentMd = path.join(outDir, "latest.md");
+  const targetMd = path.join(archiveDir, `${runId}.md`);
+  if (fs.existsSync(currentMd) && !fs.existsSync(targetMd)) fs.copyFileSync(currentMd, targetMd);
+
+  return target;
+}
+
+/**
  * Writes `latest.json` plus a timestamped raw dump. Raw records include the
  * model's full output text — that is scenario input from this repository's
  * own fixtures, never user content — and never a credential: provider error
  * strings pass through `redact()` before they get here.
+ *
+ * A live run archives the report it is replacing first; see
+ * `archiveExistingLiveReport`.
  */
 export function writeReport(outDir: string, runId: string, report: BenchmarkReport, results: ScenarioResult[]): void {
+  if (report.mode === "live") archiveExistingLiveReport(outDir);
   fs.mkdirSync(path.join(outDir, "raw"), { recursive: true });
   fs.writeFileSync(path.join(outDir, "latest.json"), `${JSON.stringify(report, null, 2)}\n`);
   fs.writeFileSync(

@@ -254,9 +254,12 @@ export async function runBenchmark(overrides: Partial<BenchmarkConfig> = {}): Pr
     // that classification, routing, guards, usage accounting and citation
     // verification still execute for real.
     const instrumentation = installProviderInstrumentation({
-      onCall: () => {
-        budget.requestsUsed += 1;
-      },
+      // `gate()` counts the call and refuses it once a ceiling is reached.
+      // Phase 22 §22E: doing this here rather than between scenarios is what
+      // makes the ceiling a hard stop — a retry, a fallback and a reviewer
+      // pass are all issued below the harness and were previously invisible
+      // to it.
+      onCall: () => budget.gate(),
       stub: config.dryRun ? StubProvider.generate.bind(StubProvider) : undefined,
     });
 
@@ -292,7 +295,14 @@ export async function runBenchmark(overrides: Partial<BenchmarkConfig> = {}): Pr
       await mapWithConcurrency(results, config.concurrency, async (result, i) => {
         const judge = pickJudge(result.execution.provider, liveProviders, (p) => configuredModels(p)[0]);
         if (!judge || budget.exhausted) return;
-        budget.requestsUsed += 1;
+        // The judge pass does not go through the instrumented adapters, so it
+        // charges itself. `gate()` rather than a bare increment, so a judge
+        // call cannot be the one thing that walks past the ceiling.
+        try {
+          budget.gate();
+        } catch {
+          return;
+        }
         result.judge = await judgeResponse({
           scenario: units[i].scenario,
           result,
@@ -340,6 +350,20 @@ export async function runBenchmark(overrides: Partial<BenchmarkConfig> = {}): Pr
     writeMarkdown(config.outDir, markdown);
 
     console.log(`[benchmark] ${budget.requestsUsed} provider call(s) made. Status: ${status}`);
+    if (budget.refusedCalls > 0) {
+      console.log(
+        `[benchmark] ${budget.refusedCalls} call(s) refused by the budget (${budget.reason()}). ` +
+          `Refused calls reached no provider and cost nothing; the run is PARTIAL.`,
+      );
+    }
+    if (config.maxCostUsd !== null) {
+      console.log(
+        `[benchmark] measured spend ${budget.costUsed.toFixed(4)} USD against a ${config.maxCostUsd} USD ceiling` +
+          (budget.unpricedCalls > 0
+            ? `; ${budget.unpricedCalls} execution(s) were unpriced and could not be charged against it.`
+            : "."),
+      );
+    }
     if (config.dryRun) {
       // Say it at the end, where it is read, and say where the live record
       // still is — the whole point of the redirect is that this run did not

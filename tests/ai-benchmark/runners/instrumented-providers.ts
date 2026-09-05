@@ -31,12 +31,28 @@ export interface ProviderCall {
   latencyMs: number;
   ok: boolean;
   errorMessage: string | null;
+  /**
+   * The budget refused this call before it reached the network, so it cost
+   * nothing and must never be counted as a provider call. It is still
+   * recorded, because "the ceiling stopped the run here" is the single most
+   * important thing to be able to read off a truncated run (Phase 22 §22E).
+   */
+  refused?: boolean;
 }
 
 const callContext = new AsyncLocalStorage<ProviderCall[]>();
 
 export interface InstallOptions {
-  /** Called before every provider call, for budget accounting. */
+  /**
+   * Called before every provider call, for budget accounting.
+   *
+   * It is a GATE, not a notification: it may throw to refuse the call, and
+   * the throw happens before the network is touched, so a refused call is
+   * free. This is the only place a ceiling can actually bite mid-scenario —
+   * the orchestrator's retry, cross-provider fallback and reviewer pass all
+   * originate below the harness, so a check that only runs between scenarios
+   * cannot see them (Phase 22 §22E).
+   */
   onCall?: () => void;
   /**
    * Replaces the network call while leaving every other stage of the
@@ -58,17 +74,27 @@ export function installProviderInstrumentation(options: InstallOptions = {}): Pr
     originals.set(provider, provider.generate);
 
     provider.generate = async (request: ProviderGenerateRequest): Promise<AIResponse> => {
-      options.onCall?.();
       const startedAt = Date.now();
-      const record = (ok: boolean, errorMessage: string | null) => {
+      const record = (ok: boolean, errorMessage: string | null, refused = false) => {
         callContext.getStore()?.push({
           provider: provider.name,
           model: request.model,
           latencyMs: Date.now() - startedAt,
           ok,
           errorMessage,
+          ...(refused ? { refused: true } : {}),
         });
       };
+
+      // The gate runs inside the try/record path so that a refusal is visible
+      // in the scenario's call list rather than vanishing into whatever the
+      // orchestrator does with a thrown provider error.
+      try {
+        options.onCall?.();
+      } catch (err) {
+        record(false, (err as Error)?.message ?? "budget refused the call", true);
+        throw err;
+      }
 
       try {
         const response = await (options.stub ?? original)(request);

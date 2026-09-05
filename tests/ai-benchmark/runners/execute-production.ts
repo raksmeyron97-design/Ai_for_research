@@ -195,10 +195,19 @@ export async function executeScenarioViaProduction(
     return { response, citationWarnings };
   });
 
-  const providerCalls: ProviderCall[] = captured.calls;
+  // A refused call was stopped at the adapter boundary by the budget: it
+  // reached no provider and cost nothing, so it must not appear in any
+  // provider-call count. It is kept separately because it is the reason the
+  // scenario has no result (Phase 22 §22E).
+  const refusedCalls: ProviderCall[] = captured.calls.filter((c) => c.refused);
+  const providerCalls: ProviderCall[] = captured.calls.filter((c) => !c.refused);
 
   if (captured.error) {
     const message = (captured.error as Error)?.message ?? "unknown error";
+    // Report a budget-truncated scenario in the vocabulary the reporter reads
+    // for `completeness`, so a run stopped by its ceiling is PARTIAL rather
+    // than a run full of provider errors.
+    const budgetTruncated = refusedCalls.length > 0;
     const usage = usageRows.at(-1);
     return {
       ...base,
@@ -221,8 +230,8 @@ export async function executeScenarioViaProduction(
       productionWarnings: [],
       providerCalls: providerCalls.length,
       costConfidence: usage?.cost_confidence ?? "unverified",
-      failureType: classifyApiError(message),
-      errorMessage: redact(message),
+      failureType: budgetTruncated ? null : classifyApiError(message),
+      errorMessage: budgetTruncated ? `skipped: ${budget.reason()}` : redact(message),
     };
   }
 
@@ -251,6 +260,11 @@ export async function executeScenarioViaProduction(
               : ("unknown_model" as const),
         }
       : { estimatedCostUsd: null, rateSource: "unknown_model" as const };
+
+    // Charge what this execution actually cost against the run's cost
+    // ceiling. Only a verified figure is charged; an unpriced model is
+    // counted as unpriced rather than assigned a guessed rate.
+    budget.recordSpend(cost.estimatedCostUsd);
 
     return {
       ...base,

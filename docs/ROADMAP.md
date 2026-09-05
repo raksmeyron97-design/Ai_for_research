@@ -9,7 +9,7 @@
 | 15 | Production security, reliability, AI safety hardening | COMPLETE |
 | 16 | AI validation harness + architecture audit (11 findings) | COMPLETE |
 | 16A | Pre-benchmark hardening: F11, F10, F9, F7, F4/F5, streaming timeout | COMPLETE |
-| 16B | Live Gemini vs OpenAI benchmark | **DEFERRED** |
+| 16B | Live Gemini vs OpenAI benchmark | **BLOCKED** — OpenAI has no credits |
 | 16 (workflow) | Section-aware research workflow, change control, versioning | COMPLETE |
 | 17 | Advanced Evidence & Literature Workspace (model + deterministic review) | COMPLETE |
 | 17B | Researcher-facing evidence & literature workspace | COMPLETE |
@@ -17,18 +17,40 @@
 | 19 | Research Integrity, Citation Verification & Academic Quality | COMPLETE |
 | 20 | Research Intelligence Validation, Conceptual Framework & Production Verification | COMPLETE |
 | 21 | Production Reproducibility, Workspace Completion & Operational Hardening | COMPLETE |
+| 22 | Production Verification, CI Reproducibility & AI Quality Evidence | COMPLETE |
 
-## Live AI benchmark: DEFERRED
+## Live AI benchmark: PARTIAL
 
-**Reason:** feature-completion priority and credit conservation.
+**Live smoke: DONE (Phase 22). Full benchmark: NOT MEASURED. Provider
+comparison: NOT POSSIBLE.**
 
-Everything needed to run it is in place — 80 scenarios across three routing
-groups driving the full production path, verified provider pricing, and budget
-rails. The only blocker is provider billing credit. Projected cost for the
-full comparison is $1.87-$3.24, or $3.75-$6.47 with the blind judge.
+Two live smoke runs completed on 2026-09-05, driving the full production path.
+They cost $0.070 together and are recorded in
+[`docs/PHASE_22_PRODUCTION_VERIFICATION.md`](./PHASE_22_PRODUCTION_VERIFICATION.md)
+and `reports/ai-benchmark/README.md`.
+
+* **Gemini** is reachable and billable. Seven scored executions per run.
+* **OpenAI** is still blocked: `429 You have no credits remaining.` Every
+  OpenAI execution is UNAVAILABLE, so there is no comparison and nothing in
+  this repository supports one.
+
+A smoke run is a wiring check over three scenarios at one repetition. **It is
+not a measurement of AI quality**, and neither run may be quoted as one.
+
+Projected cost for the full comparison is $1.87-$3.24, or $3.75-$6.47 with the
+blind judge — needs OpenAI credit. A Gemini-only full run needs neither and is
+the cheaper next step.
 
 To run it: `npm run ai:benchmark:smoke` first (~12 calls, cents), then
 `AI_BENCH_MAX_REQUESTS=1800 AI_BENCH_MAX_COST_USD=15 npm run ai:benchmark:compare`.
+
+> **On that cost cap.** Until Phase 22 `AI_BENCH_MAX_COST_USD` did nothing:
+> `RunBudget.costUsed` was never incremented by any run code, so the ceiling
+> could not stop a run at any price. It is enforced now, and the request
+> ceiling is enforced at the adapter boundary rather than between scenarios.
+> One limit remains stated rather than fixed: `gemini-3.1-pro-preview` has no
+> verified rate, so advanced- and reviewer-tier Gemini spend is invisible to
+> the cost ceiling and bounded only by `AI_BENCH_MAX_REQUESTS`.
 
 ## Open gaps by phase
 

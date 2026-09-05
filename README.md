@@ -70,8 +70,39 @@ adding new researcher-facing features. The auth/dashboard/editor golden
 path, RLS and storage isolation across every table, every phase's
 data-integrity constraints, every export format, rate limiting,
 idempotency, and secure project deletion have all been verified against
-a real local Supabase instance (Docker) and a real running server; the
-AI provider calls themselves have not, since no real Gemini/OpenAI keys
-are available in this build environment — see the readiness report's
-"Final Gate" section for what that means and doesn't mean for
-production use.
+a real local Supabase instance (Docker) and a real running server — see
+the readiness report's "Final Gate" section for what that means and
+doesn't mean for production use.
+
+Phases 17-21 add the evidence and literature workspace, methodology and
+questionnaire intelligence, research integrity and citation verification,
+the conceptual framework, and production reproducibility hardening.
+
+Phase 22 ([`docs/PHASE_22_PRODUCTION_VERIFICATION.md`](./docs/PHASE_22_PRODUCTION_VERIFICATION.md))
+executed the two things the project had never executed: the CI workflow,
+which now passes on a GitHub-hosted runner, and a live AI benchmark. The
+live runs reach Gemini through the real production path; **OpenAI remains
+blocked on billing credit**, so no provider comparison exists.
+
+**AI quality is NOT MEASURED.** Only the smoke subset — three scenarios at
+one repetition — has ever run live. That is a wiring check, not a
+measurement, and `reports/ai-benchmark/README.md` explains how to tell the
+five different things in this repository that can produce a table of model
+numbers apart from one another.
+
+## Running the gates
+
+```bash
+npm test                              # unit, integration, component
+npm run lint && npm run typecheck && npm run build
+npm run test:browser                  # real Chrome, six widths
+npm run db:verify:isolation:all       # every RLS suite, real Postgres
+npm run db:profile                    # query performance budgets
+npm run ai:benchmark:dry              # harness end to end, 0 provider calls
+npm run ai:benchmark:verify-isolation # proves a dry run cannot damage live evidence
+```
+
+The browser suite needs port 3100; if something else holds it, use
+`PLAYWRIGHT_PORT=3101 npm run test:browser`. The gate refuses to run
+against a server that is not this application rather than reporting on
+someone else's.

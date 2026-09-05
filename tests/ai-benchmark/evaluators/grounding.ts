@@ -20,6 +20,17 @@ export function evaluateGrounding(
 ): { detail: EvaluationDetail; unsupported: string[] } {
   const { text: contextText } = buildScenarioContext(scenario, "keyed");
   const evidenceNumbers = new Set(extractNumbers(contextText));
+  // A number the request itself supplied is provenanced by definition: the
+  // researcher wrote it. Phase 22 §22G found this as a false positive on
+  // `struct-quality-check`, whose material under review — "convenience sample
+  // of 100 women" — is in the prompt rather than in a retrieved corpus, so
+  // the model echoing "100" back was scored as an unsupported numeric claim.
+  //
+  // This cannot weaken the check. The model does not write the input, so
+  // nothing it fabricates can enter the evidence set this way; what changes
+  // is only that quoting the researcher's own figures stops counting as
+  // inventing them.
+  for (const n of extractNumbers(scenario.input)) evidenceNumbers.add(n);
   const allowed = new Set(scenario.expect.allowedNumbers ?? []);
 
   // Years, list markers and small ordinals are formatting noise, not claims.

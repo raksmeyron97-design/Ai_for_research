@@ -19,6 +19,10 @@ const ACTION_LABEL: Record<string, string> = {
   replace: "AI replace",
   ai_generate: "AI generate",
   restore: "Restored",
+  // Distinct from "AI insert" on purpose (§29): the researcher chose a source
+  // and the app placed a citation. Calling that an AI rewrite would misreport
+  // the one thing the history exists to keep straight.
+  evidence_insert: "Evidence insert",
 };
 
 function when(iso: string): string {

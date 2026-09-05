@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  locateClaimInSection,
+  type ClaimLocation,
+  type HighlightableClaim,
+} from "@/lib/integrity/claim-location";
 import AIChangeControl, { type ChangeAction } from "@/components/AIChangeControl";
 import SectionActions from "@/components/SectionActions";
 import type { SectionAction, SectionActionId } from "@/lib/ai/sections/actions";
@@ -30,6 +35,10 @@ export default function SectionEditor({
   onSaved,
   insertRequest,
   onInsertConsumed,
+  externalUpdate,
+  onFindEvidence,
+  highlightClaim,
+  onHighlightResolved,
 }: {
   projectId: string;
   sectionType: SectionType;
@@ -38,6 +47,25 @@ export default function SectionEditor({
   /** Text queued by the AI Copilot's "Insert" button — consumed once, then cleared by the parent. */
   insertRequest?: string | null;
   onInsertConsumed?: () => void;
+  /**
+   * Content the server already saved — an evidence insertion or a restore.
+   * Applied without re-saving: the autosave baseline moves with it, because
+   * echoing a change the server just made back to the server would record a
+   * second, spurious version of the same edit.
+   */
+  externalUpdate?: { content: string; nonce: number } | null;
+  /** Sends the selected paragraph to the Evidence pane (§27). */
+  onFindEvidence?: (passage: string, offset: number) => void;
+  /**
+   * A claim to find and select in this section (§13). `nonce` is what makes
+   * asking twice for the same claim work — the researcher can click a finding
+   * again after scrolling away, and without it the effect would not re-run.
+   */
+  highlightClaim?: { claim: HighlightableClaim; nonce: number } | null;
+  /** Reports where the highlight ended up, including when it could not be
+   *  placed — `claim_not_located` is a state the caller has to show, not an
+   *  error to swallow (§13). */
+  onHighlightResolved?: (location: ClaimLocation) => void;
 }) {
   const [content, setContent] = useState(initialSection?.content ?? "");
   const [status, setStatus] = useState<SectionStatus>(initialSection?.status ?? "not_started");
@@ -54,6 +82,9 @@ export default function SectionEditor({
   const [pending, setPending] = useState<PendingSuggestion | null>(null);
   const [busyAction, setBusyAction] = useState<SectionActionId | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  /** The researcher's current selection in the textarea, for Find evidence. */
+  const [selection, setSelection] = useState<{ text: string; start: number } | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   // Baseline to diff against, not an "is this the first effect run" flag —
   // a boolean ref for that purpose breaks under React Strict Mode's dev-only
   // double-invocation of effects (confirmed against a real Postgres
@@ -82,6 +113,61 @@ export default function SectionEditor({
     // is a fresh function each render and would cause this to loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [insertRequest]);
+
+  // Content the server changed underneath us. The baseline refs move with it
+  // so the autosave effect sees "nothing to save" rather than writing the same
+  // text back and creating a duplicate version entry.
+  useEffect(() => {
+    if (!externalUpdate) return;
+    setContent(externalUpdate.content);
+    initialContentRef.current = externalUpdate.content;
+    setSaveState("saved");
+    setSelection(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalUpdate?.nonce]);
+
+  // Finding -> claim -> section -> the sentence itself (§13).
+  //
+  // Runs against `content` — the text on screen right now, not the snapshot
+  // the claim was extracted from. Asking "is this sentence still here" of a
+  // stale copy would always answer yes, which is how a researcher ends up
+  // staring at a highlight over the wrong words.
+  useEffect(() => {
+    if (!highlightClaim) return;
+
+    const location = locateClaimInSection(content, highlightClaim.claim);
+    onHighlightResolved?.(location);
+
+    if (location.outcome !== "located" || location.start == null || location.end == null) return;
+
+    const el = textareaRef.current;
+    if (!el) return;
+
+    // focus() before setSelectionRange(): a selection in an unfocused
+    // textarea is invisible in every browser, so the researcher would be told
+    // the sentence was found and shown nothing.
+    el.focus();
+    el.setSelectionRange(location.start, location.end);
+
+    // Scroll the selection into view. A textarea will not do this on its own
+    // for a programmatic selection, so the line is measured from the text
+    // before it and the scrollTop set directly.
+    const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 20;
+    const linesBefore = content.slice(0, location.start).split("\n").length - 1;
+    el.scrollTop = Math.max(0, linesBefore * lineHeight - el.clientHeight / 2);
+
+    setSelection({ text: content.slice(location.start, location.end), start: location.start });
+    // `content` is deliberately not a dependency: re-running on every
+    // keystroke would fight the researcher for their cursor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightClaim?.nonce]);
+
+  function captureSelection(el: HTMLTextAreaElement) {
+    const text = el.value.slice(el.selectionStart, el.selectionEnd).trim();
+    // A stray click is a zero-width selection, and a couple of words is not a
+    // paragraph worth extracting claims from.
+    setSelection(text.length >= 20 ? { text, start: el.selectionStart } : null);
+  }
 
   async function runAction(action: SectionAction) {
     setBusyAction(action.id);
@@ -194,6 +280,24 @@ export default function SectionEditor({
         onRun={runAction}
       />
 
+      {onFindEvidence && (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={!selection}
+            onClick={() => selection && onFindEvidence(selection.text, selection.start)}
+            className="rounded border border-neutral-300 px-2.5 py-1.5 text-xs disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2"
+          >
+            Find evidence for selection
+          </button>
+          <span className="text-[11px] text-neutral-500">
+            {selection
+              ? `${selection.text.split(/\s+/).length} words selected`
+              : "Select a paragraph to pull out its claims."}
+          </span>
+        </div>
+      )}
+
       {actionError && (
         <p role="alert" className="rounded border border-red-300 bg-red-50 p-2 text-xs text-red-800">
           {actionError} Your section content was not changed.
@@ -212,8 +316,11 @@ export default function SectionEditor({
       )}
 
       <textarea
+        ref={textareaRef}
         value={content}
         onChange={(e) => setContent(e.target.value)}
+        onSelect={(e) => captureSelection(e.currentTarget)}
+        onBlur={(e) => captureSelection(e.currentTarget)}
         placeholder={`Write ${SECTION_LABELS[sectionType].toLowerCase()} here, or ask the AI Copilot for a draft.`}
         className="min-h-0 flex-1 resize-none rounded border border-neutral-200 p-3 text-sm leading-relaxed focus:border-neutral-400 focus:outline-none"
         id={`section-editor-${sectionType}`}

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { computeCost, loadConfig } from "../config";
 import { AB_SCENARIO_IDS, ALL_SCENARIOS } from "../scenarios";
 import { classifyApiError, classifyResult } from "../failure-taxonomy";
-import { RunBudget, mapWithConcurrency, redact } from "../runners/execute";
+import { BenchmarkBudgetExceededError, RunBudget, mapWithConcurrency, redact } from "../runners/execute";
 import { StubProvider, STUB_MODEL_ID } from "../runners/stub-provider";
 import { apiMode, sdkVersion } from "../runners/preflight";
 import { QUALITY_CHECK_RESPONSE_JSON_SCHEMA } from "@/lib/ai/schemas";
@@ -87,6 +87,92 @@ describe("run budget", () => {
     budget.cancel();
     expect(budget.exhausted).toBe(true);
     expect(budget.reason()).toBe("run cancelled");
+  });
+});
+
+/**
+ * Phase 22 §22E. The three tests above assert what `RunBudget` decides when
+ * its counters hold certain values, and they passed throughout Phase 21 while
+ * the cost ceiling was in fact unenforceable: nothing in the run path ever
+ * incremented `costUsed`, so the only writer was a test assigning to it.
+ * `AI_BENCH_MAX_COST_USD` was documented in `docs/ROADMAP.md` as the way to
+ * cap a live compare at 15 USD, and it could not have stopped a run at any
+ * price.
+ *
+ * These test the wiring instead: that spend is charged from a measured cost,
+ * and that a ceiling actually refuses a call. They fail against the Phase 21
+ * implementation.
+ */
+describe("run budget enforcement", () => {
+  it("charges measured spend, so the cost ceiling can be reached by running", () => {
+    const budget = new RunBudget(config({ maxRequests: 1000, maxCostUsd: 0.5 }));
+
+    budget.recordSpend(0.2);
+    budget.recordSpend(0.2);
+    expect(budget.exhausted).toBe(false);
+
+    budget.recordSpend(0.2);
+    expect(budget.costUsed).toBeCloseTo(0.6, 6);
+    expect(budget.exhausted).toBe(true);
+    expect(budget.reason()).toContain("cost ceiling");
+  });
+
+  it("counts an unpriced execution as unpriced rather than charging a guess", () => {
+    const budget = new RunBudget(config({ maxRequests: 1000, maxCostUsd: 0.5 }));
+
+    budget.recordSpend(null);
+    budget.recordSpend(undefined);
+
+    // Nothing invented: an unpriced model contributes 0 to the ceiling, and
+    // the run records how much of itself the ceiling could not see.
+    expect(budget.costUsed).toBe(0);
+    expect(budget.unpricedCalls).toBe(2);
+    expect(budget.exhausted).toBe(false);
+  });
+
+  it("gate() counts a call, and refuses once the request ceiling is reached", () => {
+    const budget = new RunBudget(config({ maxRequests: 2, maxCostUsd: null }));
+
+    budget.gate();
+    budget.gate();
+    expect(budget.requestsUsed).toBe(2);
+
+    // The third is refused *before* the network, which is the only thing that
+    // makes the ceiling a hard stop for calls the orchestrator issues itself.
+    expect(() => budget.gate()).toThrow(BenchmarkBudgetExceededError);
+    expect(budget.requestsUsed).toBe(2);
+    expect(budget.refusedCalls).toBe(1);
+  });
+
+  it("gate() refuses once measured spend reaches the cost ceiling", () => {
+    const budget = new RunBudget(config({ maxRequests: 1000, maxCostUsd: 0.5 }));
+
+    budget.gate();
+    budget.recordSpend(0.75);
+
+    expect(() => budget.gate()).toThrow(/cost ceiling/);
+    expect(budget.refusedCalls).toBe(1);
+  });
+
+  it("a refused call is never counted as a request, however many are refused", () => {
+    // The shape of a real overrun: the orchestrator answers a refusal with a
+    // retry and a cross-provider fallback, each of which is refused in turn.
+    // None of them reached a provider, so none may be billed to the run.
+    const budget = new RunBudget(config({ maxRequests: 1, maxCostUsd: null }));
+    budget.gate();
+
+    for (let i = 0; i < 5; i += 1) {
+      expect(() => budget.gate()).toThrow(BenchmarkBudgetExceededError);
+    }
+
+    expect(budget.requestsUsed).toBe(1);
+    expect(budget.refusedCalls).toBe(5);
+  });
+
+  it("gate() refuses after cancellation", () => {
+    const budget = new RunBudget(config({ maxRequests: 1000, maxCostUsd: null }));
+    budget.cancel();
+    expect(() => budget.gate()).toThrow(/run cancelled/);
   });
 });
 

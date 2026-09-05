@@ -1,0 +1,120 @@
+import { defineConfig, devices } from "@playwright/test";
+
+/**
+ * Real-browser verification (§27, §47).
+ *
+ * `channel: "chrome"` rather than Playwright's bundled Chromium, which has no
+ * build for macOS 13 — the platform this repository is developed on. Driving
+ * the system Chrome is still a real engine running real layout, which is the
+ * whole point: jsdom does not evaluate Tailwind breakpoints, so every
+ * responsive claim made in Phases 17B-19 was verified by reading class names
+ * rather than by measuring anything.
+ *
+ * Deliberately outside `npm test`. Vitest and Playwright both export `test`,
+ * and a browser run needs a built server, so mixing them would make the fast
+ * suite slow and its failures ambiguous. `npm run test:browser` is the gate.
+ *
+ * The viewports are not a rounded-off sample: 320 is the narrowest phone
+ * still in use, 375 and 414 are the two common iPhone widths, 768 is the
+ * tablet breakpoint and 1280 is where the editor-plus-aside layout is
+ * supposed to hold.
+ *
+ * 1024 is added in Phase 21 (§26, §52), and it is not filler. Tailwind's `lg`
+ * breakpoint is 1024px, so it is the exact width at which the workspace
+ * switches from stacked panes to side-by-side — the one place a layout can
+ * be correct on both sides of a boundary and broken exactly on it. It is also
+ * a landscape iPad and the most common small laptop, so it is where a real
+ * researcher most often is.
+ */
+export const VIEWPORTS = {
+  mobile320: { width: 320, height: 640 },
+  mobile375: { width: 375, height: 812 },
+  mobile414: { width: 414, height: 896 },
+  tablet768: { width: 768, height: 1024 },
+  laptop1024: { width: 1024, height: 768 },
+  desktop1280: { width: 1280, height: 900 },
+} as const;
+
+/**
+ * The port is configurable, and that is a Phase 22 finding rather than a
+ * convenience (§22B, "port assumptions").
+ *
+ * 3100 was hard-coded in three places — the server command, the readiness
+ * URL, and the default baseURL. On a machine where something else already
+ * held 3100, `reuseExistingServer` pointed the entire browser gate at that
+ * other server. What actually happened here: an unrelated project's
+ * `next dev -p 3100` was running, its `/login` answered 404, and the gate sat
+ * in `waitForURL` until it failed with "Timed out waiting 300000ms from
+ * config.webServer" — five minutes, and a message that names neither the port
+ * nor the squatter.
+ *
+ * The worse version of the same bug is the one that does not fail: had that
+ * server answered 200 on `/login`, all 71 tests would have run against
+ * somebody else's application and reported on this one.
+ *
+ * So: one source of truth for the port, overridable with PLAYWRIGHT_PORT, and
+ * `tests/browser/global-setup.ts` refuses to proceed unless the server on it
+ * actually serves *this* app.
+ */
+const PORT = process.env.PLAYWRIGHT_PORT ?? "3100";
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${PORT}`;
+
+export default defineConfig({
+  testDir: "./tests/browser",
+  // A build plus a seed is slow enough that a 30s default turns an ordinary
+  // cold start into a spurious failure.
+  timeout: 90_000,
+  expect: { timeout: 15_000 },
+  fullyParallel: true,
+  /**
+   * Phase 21: bounded parallelism, because the suite was flaky and the
+   * flakiness was contention.
+   *
+   * Playwright defaults to one worker per core — eight here — and every one of
+   * them drives a cold page load against a single `next start` process. Two
+   * consecutive full runs failed four tests and then a different two, all with
+   * the same signature: the project heading not present within the expect
+   * timeout. Run with `--workers=1` the identical tests pass, 16 of 16. So the
+   * failures were the server being asked to render eight first-paints at once,
+   * not the interface being wrong — and a responsive gate that reports a
+   * layout failure when the machine is busy is worse than a slower one,
+   * because it teaches people to re-run until green.
+   *
+   * Two, and it is measured rather than guessed. Across full runs of the same
+   * 71 tests on this machine:
+   *
+   *   default (8 workers)  13.1m, 5 failed
+   *   4 workers             8.8m, 4 failed
+   *   2 workers             4.2m, 0 failed
+   *
+   * Fewer workers is not a trade of speed for reliability here — it is faster
+   * outright, because a contended run spends its time in expect timeouts
+   * before failing. The bottleneck is one `next start` process rendering
+   * first-paints, not the CPU.
+   *
+   * The timeouts go up alongside for the same reason they did in
+   * vitest.config.ts: these assert correctness, not speed.
+   */
+  workers: 2,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 1 : 0,
+  reporter: process.env.CI ? "line" : [["list"]],
+  globalSetup: "./tests/browser/global-setup.ts",
+  use: {
+    baseURL: BASE_URL,
+    storageState: "tests/browser/.auth/state.json",
+    trace: "retain-on-failure",
+  },
+  projects: [{ name: "chrome", use: { ...devices["Desktop Chrome"], channel: "chrome" } }],
+  webServer: {
+    // `next start` on the production build, not `next dev`: dev-mode layout
+    // shifts and overlays are not what ships, and a responsive gate that
+    // passes only in dev is worth nothing.
+    command: `npm run build && npx next start --port ${PORT} --hostname 127.0.0.1`,
+    url: `${BASE_URL}/login`,
+    reuseExistingServer: !process.env.CI,
+    timeout: 300_000,
+    stdout: "pipe",
+    stderr: "pipe",
+  },
+});

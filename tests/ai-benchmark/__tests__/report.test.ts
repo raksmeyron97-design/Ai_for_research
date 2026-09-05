@@ -138,6 +138,56 @@ describe("production status", () => {
   });
 });
 
+describe("provider_calls counts network calls, not executions (Phase 21 §11)", () => {
+  it("is zero for a dry run even though every stubbed execution spent budget", () => {
+    const report = buildReport({
+      runId: "r", suite: "full", mode: "dry", plannedCalls: 2, commit: null, status: "NOT READY",
+      statuses,
+      summaries: [],
+      results: [
+        // The stub still reports the calls it would have made. Counting those
+        // would have a run that opened no socket claim it called a provider.
+        scored({ mode: "MOCKED", providerCalls: 3 }),
+        scored({ mode: "MOCKED", providerCalls: 2 }),
+      ],
+      failures: [], recommendations: [], caveats: [],
+    });
+
+    expect(report.mode).toBe("dry");
+    expect(report.provider_calls).toBe(0);
+  });
+
+  it("counts a live execution's orchestrator-internal calls, not just one per scenario", () => {
+    const report = buildReport({
+      runId: "r", suite: "full", mode: "live", plannedCalls: 2, commit: null, status: "NOT READY",
+      statuses,
+      summaries: [],
+      // A retry, a cross-provider fallback and the reviewer pass are separate
+      // provider calls that cost separate money, which is why the execution
+      // record carries a count rather than a boolean.
+      results: [scored({ providerCalls: 3 }), scored({ providerCalls: 1 })],
+      failures: [], recommendations: [], caveats: [],
+    });
+
+    expect(report.provider_calls).toBe(4);
+  });
+
+  it("does not count a scenario that never reached a provider", () => {
+    const report = buildReport({
+      runId: "r", suite: "smoke", mode: "live", plannedCalls: 1, commit: null, status: "NOT READY",
+      statuses,
+      summaries: [],
+      results: [scored({ mode: "UNAVAILABLE", providerCalls: 0 })],
+      failures: [], recommendations: [], caveats: [],
+    });
+
+    // This is the shape of the committed Phase 16 record: credentials
+    // accepted, every scenario UNAVAILABLE, no benchmark result.
+    expect(report.provider_calls).toBe(0);
+    expect(report.execution_modes).toEqual({ UNAVAILABLE: 1 });
+  });
+});
+
 describe("report generation", () => {
   const tmpDirs: string[] = [];
   afterEach(() => {
@@ -148,7 +198,7 @@ describe("report generation", () => {
   it("produces a machine-readable report with the Step 25 keys", () => {
     const summary = summarize([scored()]);
     const report = buildReport({
-      runId: "run_test", suite: "smoke", plannedCalls: 1, commit: "abc1234", status: "NOT READY",
+      runId: "run_test", suite: "smoke", mode: "live", plannedCalls: 1, commit: "abc1234", status: "NOT READY",
       statuses, summaries: [summary], results: [scored()], failures: [],
       recommendations: ["r"], caveats: ["c"],
     });
@@ -168,7 +218,7 @@ describe("report generation", () => {
     tmpDirs.push(dir);
     const summary = summarize([scored()]);
     const report = buildReport({
-      runId: "run_test", suite: "smoke", plannedCalls: 1, commit: null, status: "NOT READY",
+      runId: "run_test", suite: "smoke", mode: "live", plannedCalls: 1, commit: null, status: "NOT READY",
       statuses, summaries: [summary], results: [scored()], failures: [], recommendations: [], caveats: [],
     });
 
@@ -181,7 +231,7 @@ describe("report generation", () => {
   it("renders caveats above the results so no number is quoted without them", () => {
     const summary = summarize([scored()]);
     const report = buildReport({
-      runId: "run_test", suite: "smoke", plannedCalls: 1, commit: null, status: "NOT READY",
+      runId: "run_test", suite: "smoke", mode: "live", plannedCalls: 1, commit: null, status: "NOT READY",
       statuses, summaries: [summary], results: [scored()], failures: [],
       recommendations: [], caveats: ["**This run is MOCKED.**"],
     });
@@ -194,7 +244,7 @@ describe("report generation", () => {
 
   it("states plainly when there is nothing to report", () => {
     const report = buildReport({
-      runId: "run_test", suite: "smoke", plannedCalls: 1, commit: null, status: "NOT READY",
+      runId: "run_test", suite: "smoke", mode: "live", plannedCalls: 1, commit: null, status: "NOT READY",
       statuses, summaries: [], results: [], failures: [], recommendations: [], caveats: [],
     });
     expect(renderMarkdown(report, [])).toContain("Nothing about model quality can be concluded");
@@ -206,7 +256,7 @@ describe("recommendations when nothing was measured", () => {
     // Guards the wording fix: a LIVE preflight with zero successful
     // executions must not be reported as "set your API key".
     const liveButFailed = buildReport({
-      runId: "r", suite: "smoke", plannedCalls: 0, commit: null, status: "NOT READY",
+      runId: "r", suite: "smoke", mode: "live", plannedCalls: 0, commit: null, status: "NOT READY",
       statuses, summaries: [], results: [], failures: [],
       recommendations: [
         "No live model measurement exists despite a working credential for gemini: every generation call failed.",
@@ -222,7 +272,7 @@ describe("recommendations when nothing was measured", () => {
 describe("run completeness", () => {
   it("marks a run complete when nothing was skipped", () => {
     const report = buildReport({
-      runId: "r", suite: "smoke", plannedCalls: 1, commit: null, status: "NOT READY",
+      runId: "r", suite: "smoke", mode: "live", plannedCalls: 1, commit: null, status: "NOT READY",
       statuses, summaries: [], results: [scored()], failures: [], recommendations: [], caveats: [],
     });
     expect(report.completeness.status).toBe("complete");
@@ -239,7 +289,7 @@ describe("run completeness", () => {
     });
 
     const report = buildReport({
-      runId: "r", suite: "full", plannedCalls: 5, commit: null, status: "NOT READY",
+      runId: "r", suite: "full", mode: "live", plannedCalls: 5, commit: null, status: "NOT READY",
       statuses, summaries: [], results: [scored(), skippedResult], failures: [], recommendations: [], caveats: [],
     });
 
@@ -252,7 +302,7 @@ describe("run completeness", () => {
     const skippedResult = scored({ ok: false, output: "", attempts: 0, errorMessage: "skipped: run cancelled" });
     const summary = summarize([scored()]);
     const report = buildReport({
-      runId: "r", suite: "full", plannedCalls: 2, commit: null, status: "NOT READY",
+      runId: "r", suite: "full", mode: "live", plannedCalls: 2, commit: null, status: "NOT READY",
       statuses, summaries: [summary], results: [scored(), skippedResult], failures: [], recommendations: [], caveats: [],
     });
 

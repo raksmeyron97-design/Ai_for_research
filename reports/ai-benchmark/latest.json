@@ -2,10 +2,12 @@
   "phase": 16,
   "status": "NOT READY",
   "benchmark_version": "16.0.0",
-  "run_id": "run_2026-09-01T11-19-35-444Z_a2266530",
-  "timestamp": "2026-09-01T11:19:48.165Z",
-  "commit": "a591921",
+  "run_id": "run_2026-09-05T16-18-26-795Z_6a74f04f",
+  "timestamp": "2026-09-05T16:19:43.644Z",
+  "commit": "c707620",
   "suite": "smoke",
+  "mode": "live",
+  "provider_calls": 20,
   "completeness": {
     "status": "complete",
     "plannedCalls": 12,
@@ -13,7 +15,9 @@
     "reason": null
   },
   "execution_modes": {
-    "UNAVAILABLE": 12
+    "LIVE": 7,
+    "UNAVAILABLE": 4,
+    "DEGRADED": 1
   },
   "providers": {
     "gemini": {
@@ -58,6 +62,7 @@
         "gemini-3.5-transcribe-live",
         "gemini-3.6-flash",
         "gemini-3.7-flash",
+        "gemini-3.8-flash",
         "gemini-embedding-001",
         "gemini-embedding-2",
         "gemini-embedding-2-preview",
@@ -72,12 +77,13 @@
         "gemma-4-31b-it",
         "lyria-3-clip-preview",
         "lyria-3-pro-preview",
+        "lyria-3.5",
         "nano-banana-pro-preview",
         "veo-3.1-fast-generate-preview",
         "veo-3.1-generate-preview",
         "veo-3.1-lite-generate-preview"
       ],
-      "reason": "Credential accepted; 52 models listed."
+      "reason": "Credential accepted; 54 models listed."
     },
     "openai": {
       "provider": "openai",
@@ -162,6 +168,7 @@
         "gpt-5.6-luna",
         "gpt-5.6-sol",
         "gpt-5.6-terra",
+        "gpt-6-astra",
         "gpt-audio",
         "gpt-audio-1.5",
         "gpt-audio-2025-08-28",
@@ -206,62 +213,93 @@
         "tts-1-hd-1106",
         "whisper-1"
       ],
-      "reason": "Credential accepted; 118 models listed. Configured model(s) not enumerated by this key's model list, benchmarked anyway (an unlisted id may still be a served alias): gpt-5.6."
+      "reason": "Credential accepted; 119 models listed. Configured model(s) not enumerated by this key's model list, benchmarked anyway (an unlisted id may still be a served alias): gpt-5.6."
     }
   },
   "overall_scores": {
-    "gemini:gemini-3.5-flash-lite:variantA": null,
-    "gemini:gemini-3.5-flash-lite:variantB": null,
-    "gemini:gemini-3.6-flash:variantA": null,
-    "gemini:gemini-3.6-flash:variantB": null,
-    "openai:gpt-5.6:variantA": null,
-    "openai:gpt-5.6:variantB": null
+    "gemini:gemini:gemini-3.6-flash:variantB": 100,
+    "routed:gemini:gemini-3.6-flash:variantB": 99.69711538461537,
+    "gemini:gemini:gemini-3.6-flash:variantA": 85.70467032967035,
+    "routed:gemini:gemini-3.6-flash:variantA": 74.94043576104747,
+    "routed:gemini:gemini-3.1-pro-preview:variantA": 11.111111111111112,
+    "openai:openai:gpt-5.4-mini:variantA": null,
+    "openai:openai:gpt-5.4-mini:variantB": null,
+    "openai:openai:gpt-5.6:variantA": null
   },
   "category_scores": {
-    "gemini:gemini-3.5-flash-lite:variantA": {},
-    "gemini:gemini-3.5-flash-lite:variantB": {},
-    "gemini:gemini-3.6-flash:variantA": {},
-    "gemini:gemini-3.6-flash:variantB": {},
-    "openai:gpt-5.6:variantA": {},
-    "openai:gpt-5.6:variantB": {}
+    "gemini:gemini:gemini-3.6-flash:variantB": {
+      "rag_grounding": 100
+    },
+    "routed:gemini:gemini-3.6-flash:variantB": {
+      "rag_grounding": 99.69711538461537
+    },
+    "gemini:gemini:gemini-3.6-flash:variantA": {
+      "rag_grounding": 99.97115384615385,
+      "hallucination": 100.00000000000001,
+      "structured_output": 57.14285714285714
+    },
+    "routed:gemini:gemini-3.6-flash:variantA": {
+      "rag_grounding": 99.9423076923077,
+      "hallucination": 49.93856382978724
+    },
+    "routed:gemini:gemini-3.1-pro-preview:variantA": {
+      "structured_output": 11.111111111111112
+    },
+    "openai:openai:gpt-5.4-mini:variantA": {},
+    "openai:openai:gpt-5.4-mini:variantB": {},
+    "openai:openai:gpt-5.6:variantA": {}
   },
   "latency": {
-    "gemini:gemini-3.5-flash-lite:variantA": {
+    "gemini:gemini:gemini-3.6-flash:variantB": {
+      "n": 1,
+      "min": 5696,
+      "median": 5696,
+      "p95": 5696,
+      "max": 5696
+    },
+    "routed:gemini:gemini-3.6-flash:variantB": {
+      "n": 1,
+      "min": 7275,
+      "median": 7275,
+      "p95": 7275,
+      "max": 7275
+    },
+    "gemini:gemini:gemini-3.6-flash:variantA": {
+      "n": 3,
+      "min": 5294,
+      "median": 9456,
+      "p95": 9569,
+      "max": 9569
+    },
+    "routed:gemini:gemini-3.6-flash:variantA": {
+      "n": 2,
+      "min": 7506,
+      "median": 7763,
+      "p95": 8020,
+      "max": 8020
+    },
+    "routed:gemini:gemini-3.1-pro-preview:variantA": {
+      "n": 1,
+      "min": 34065,
+      "median": 34065,
+      "p95": 34065,
+      "max": 34065
+    },
+    "openai:openai:gpt-5.4-mini:variantA": {
       "n": 0,
       "min": 0,
       "median": 0,
       "p95": 0,
       "max": 0
     },
-    "gemini:gemini-3.5-flash-lite:variantB": {
+    "openai:openai:gpt-5.4-mini:variantB": {
       "n": 0,
       "min": 0,
       "median": 0,
       "p95": 0,
       "max": 0
     },
-    "gemini:gemini-3.6-flash:variantA": {
-      "n": 0,
-      "min": 0,
-      "median": 0,
-      "p95": 0,
-      "max": 0
-    },
-    "gemini:gemini-3.6-flash:variantB": {
-      "n": 0,
-      "min": 0,
-      "median": 0,
-      "p95": 0,
-      "max": 0
-    },
-    "openai:gpt-5.6:variantA": {
-      "n": 0,
-      "min": 0,
-      "median": 0,
-      "p95": 0,
-      "max": 0
-    },
-    "openai:gpt-5.6:variantB": {
+    "openai:openai:gpt-5.6:variantA": {
       "n": 0,
       "min": 0,
       "median": 0,
@@ -270,7 +308,52 @@
     }
   },
   "tokens": {
-    "gemini:gemini-3.5-flash-lite:variantA": {
+    "gemini:gemini:gemini-3.6-flash:variantB": {
+      "medianInput": 713,
+      "medianOutput": 176,
+      "medianTotal": 889,
+      "medianReasoning": null,
+      "medianRetrievedContext": 248,
+      "providerReported": 1,
+      "estimated": 0
+    },
+    "routed:gemini:gemini-3.6-flash:variantB": {
+      "medianInput": 713,
+      "medianOutput": 197,
+      "medianTotal": 910,
+      "medianReasoning": null,
+      "medianRetrievedContext": 248,
+      "providerReported": 1,
+      "estimated": 0
+    },
+    "gemini:gemini:gemini-3.6-flash:variantA": {
+      "medianInput": 713,
+      "medianOutput": 376,
+      "medianTotal": 1223,
+      "medianReasoning": null,
+      "medianRetrievedContext": 248,
+      "providerReported": 3,
+      "estimated": 0
+    },
+    "routed:gemini:gemini-3.6-flash:variantA": {
+      "medianInput": 793,
+      "medianOutput": 281.5,
+      "medianTotal": 1074.5,
+      "medianReasoning": null,
+      "medianRetrievedContext": 326.5,
+      "providerReported": 2,
+      "estimated": 0
+    },
+    "routed:gemini:gemini-3.1-pro-preview:variantA": {
+      "medianInput": 644,
+      "medianOutput": 67,
+      "medianTotal": 711,
+      "medianReasoning": null,
+      "medianRetrievedContext": 0,
+      "providerReported": 1,
+      "estimated": 0
+    },
+    "openai:openai:gpt-5.4-mini:variantA": {
       "medianInput": null,
       "medianOutput": null,
       "medianTotal": null,
@@ -279,7 +362,7 @@
       "providerReported": 0,
       "estimated": 0
     },
-    "gemini:gemini-3.5-flash-lite:variantB": {
+    "openai:openai:gpt-5.4-mini:variantB": {
       "medianInput": null,
       "medianOutput": null,
       "medianTotal": null,
@@ -288,34 +371,7 @@
       "providerReported": 0,
       "estimated": 0
     },
-    "gemini:gemini-3.6-flash:variantA": {
-      "medianInput": null,
-      "medianOutput": null,
-      "medianTotal": null,
-      "medianReasoning": null,
-      "medianRetrievedContext": 0,
-      "providerReported": 0,
-      "estimated": 0
-    },
-    "gemini:gemini-3.6-flash:variantB": {
-      "medianInput": null,
-      "medianOutput": null,
-      "medianTotal": null,
-      "medianReasoning": null,
-      "medianRetrievedContext": 0,
-      "providerReported": 0,
-      "estimated": 0
-    },
-    "openai:gpt-5.6:variantA": {
-      "medianInput": null,
-      "medianOutput": null,
-      "medianTotal": null,
-      "medianReasoning": null,
-      "medianRetrievedContext": 0,
-      "providerReported": 0,
-      "estimated": 0
-    },
-    "openai:gpt-5.6:variantB": {
+    "openai:openai:gpt-5.6:variantA": {
       "medianInput": null,
       "medianOutput": null,
       "medianTotal": null,
@@ -326,37 +382,49 @@
     }
   },
   "cost": {
-    "gemini:gemini-3.5-flash-lite:variantA": {
+    "gemini:gemini:gemini-3.6-flash:variantB": {
+      "totalUsd": 0.0038422499999999997,
+      "perRequestUsd": 0.0038422499999999997,
+      "perSuccessUsd": 0.0038422499999999997,
+      "rateSource": "verified_app_pricing"
+    },
+    "routed:gemini:gemini-3.6-flash:variantB": {
+      "totalUsd": 0.005376000000000001,
+      "perRequestUsd": 0.005376000000000001,
+      "perSuccessUsd": 0.005376000000000001,
+      "rateSource": "verified_app_pricing"
+    },
+    "gemini:gemini:gemini-3.6-flash:variantA": {
+      "totalUsd": 0.01629375,
+      "perRequestUsd": 0.0054312499999999994,
+      "perSuccessUsd": 0.0054312499999999994,
+      "rateSource": "verified_app_pricing"
+    },
+    "routed:gemini:gemini-3.6-flash:variantA": {
+      "totalUsd": 0.01035075,
+      "perRequestUsd": 0.005175375,
+      "perSuccessUsd": 0.005175375,
+      "rateSource": "verified_app_pricing"
+    },
+    "routed:gemini:gemini-3.1-pro-preview:variantA": {
       "totalUsd": null,
       "perRequestUsd": null,
       "perSuccessUsd": null,
       "rateSource": "unknown_model"
     },
-    "gemini:gemini-3.5-flash-lite:variantB": {
+    "openai:openai:gpt-5.4-mini:variantA": {
       "totalUsd": null,
       "perRequestUsd": null,
       "perSuccessUsd": null,
       "rateSource": "unknown_model"
     },
-    "gemini:gemini-3.6-flash:variantA": {
+    "openai:openai:gpt-5.4-mini:variantB": {
       "totalUsd": null,
       "perRequestUsd": null,
       "perSuccessUsd": null,
       "rateSource": "unknown_model"
     },
-    "gemini:gemini-3.6-flash:variantB": {
-      "totalUsd": null,
-      "perRequestUsd": null,
-      "perSuccessUsd": null,
-      "rateSource": "unknown_model"
-    },
-    "openai:gpt-5.6:variantA": {
-      "totalUsd": null,
-      "perRequestUsd": null,
-      "perSuccessUsd": null,
-      "rateSource": "unknown_model"
-    },
-    "openai:gpt-5.6:variantB": {
+    "openai:openai:gpt-5.6:variantA": {
       "totalUsd": null,
       "perRequestUsd": null,
       "perSuccessUsd": null,
@@ -364,7 +432,110 @@
     }
   },
   "rag": {
-    "gemini:gemini-3.5-flash-lite:variantA": {
+    "gemini:gemini:gemini-3.6-flash:variantB": {
+      "citation_precision": 1,
+      "citation_recall": 1,
+      "fabricated_citation_rate": 0,
+      "unsupported_claim_rate": 0,
+      "hallucination_rate": null,
+      "abstention_accuracy": null,
+      "by_answerability_class": {
+        "class_1": {
+          "n": 1,
+          "overall": 100,
+          "groundedness": 100,
+          "citationPrecision": 1,
+          "citationRecall": 1,
+          "abstentionAccuracy": null,
+          "unsupportedClaimRate": 0
+        }
+      }
+    },
+    "routed:gemini:gemini-3.6-flash:variantB": {
+      "citation_precision": 1,
+      "citation_recall": 1,
+      "fabricated_citation_rate": 0,
+      "unsupported_claim_rate": 0,
+      "hallucination_rate": null,
+      "abstention_accuracy": null,
+      "by_answerability_class": {
+        "class_1": {
+          "n": 1,
+          "overall": 99.69711538461537,
+          "groundedness": 100,
+          "citationPrecision": 1,
+          "citationRecall": 1,
+          "abstentionAccuracy": null,
+          "unsupportedClaimRate": 0
+        }
+      }
+    },
+    "gemini:gemini:gemini-3.6-flash:variantA": {
+      "citation_precision": 1,
+      "citation_recall": 1,
+      "fabricated_citation_rate": 0,
+      "unsupported_claim_rate": 0.3333333333333333,
+      "hallucination_rate": 0,
+      "abstention_accuracy": 1,
+      "by_answerability_class": {
+        "class_1": {
+          "n": 1,
+          "overall": 99.97115384615385,
+          "groundedness": 100,
+          "citationPrecision": 1,
+          "citationRecall": 1,
+          "abstentionAccuracy": null,
+          "unsupportedClaimRate": 0
+        },
+        "class_3": {
+          "n": 1,
+          "overall": 100.00000000000001,
+          "groundedness": 100,
+          "citationPrecision": null,
+          "citationRecall": null,
+          "abstentionAccuracy": 1,
+          "unsupportedClaimRate": 0
+        }
+      }
+    },
+    "routed:gemini:gemini-3.6-flash:variantA": {
+      "citation_precision": 1,
+      "citation_recall": 1,
+      "fabricated_citation_rate": 0,
+      "unsupported_claim_rate": 0,
+      "hallucination_rate": 1,
+      "abstention_accuracy": 0,
+      "by_answerability_class": {
+        "class_1": {
+          "n": 1,
+          "overall": 99.9423076923077,
+          "groundedness": 100,
+          "citationPrecision": 1,
+          "citationRecall": 1,
+          "abstentionAccuracy": null,
+          "unsupportedClaimRate": 0
+        },
+        "class_3": {
+          "n": 1,
+          "overall": 49.93856382978724,
+          "groundedness": 100,
+          "citationPrecision": null,
+          "citationRecall": null,
+          "abstentionAccuracy": 0,
+          "unsupportedClaimRate": 0
+        }
+      }
+    },
+    "routed:gemini:gemini-3.1-pro-preview:variantA": {
+      "citation_precision": null,
+      "citation_recall": null,
+      "fabricated_citation_rate": 0,
+      "unsupported_claim_rate": 0,
+      "hallucination_rate": null,
+      "abstention_accuracy": null,
+      "by_answerability_class": {}
+    },
+    "openai:openai:gpt-5.4-mini:variantA": {
       "citation_precision": null,
       "citation_recall": null,
       "fabricated_citation_rate": null,
@@ -373,7 +544,7 @@
       "abstention_accuracy": null,
       "by_answerability_class": {}
     },
-    "gemini:gemini-3.5-flash-lite:variantB": {
+    "openai:openai:gpt-5.4-mini:variantB": {
       "citation_precision": null,
       "citation_recall": null,
       "fabricated_citation_rate": null,
@@ -382,34 +553,7 @@
       "abstention_accuracy": null,
       "by_answerability_class": {}
     },
-    "gemini:gemini-3.6-flash:variantA": {
-      "citation_precision": null,
-      "citation_recall": null,
-      "fabricated_citation_rate": null,
-      "unsupported_claim_rate": null,
-      "hallucination_rate": null,
-      "abstention_accuracy": null,
-      "by_answerability_class": {}
-    },
-    "gemini:gemini-3.6-flash:variantB": {
-      "citation_precision": null,
-      "citation_recall": null,
-      "fabricated_citation_rate": null,
-      "unsupported_claim_rate": null,
-      "hallucination_rate": null,
-      "abstention_accuracy": null,
-      "by_answerability_class": {}
-    },
-    "openai:gpt-5.6:variantA": {
-      "citation_precision": null,
-      "citation_recall": null,
-      "fabricated_citation_rate": null,
-      "unsupported_claim_rate": null,
-      "hallucination_rate": null,
-      "abstention_accuracy": null,
-      "by_answerability_class": {}
-    },
-    "openai:gpt-5.6:variantB": {
+    "openai:openai:gpt-5.6:variantA": {
       "citation_precision": null,
       "citation_recall": null,
       "fabricated_citation_rate": null,
@@ -421,99 +565,63 @@
   },
   "failures": [
     {
-      "scenarioId": "rag-c1-prevalence-single",
-      "provider": "gemini",
-      "model": "gemini-3.5-flash-lite",
-      "failureType": "RATE_LIMIT",
-      "severity": "medium",
-      "reproducible": true,
-      "probableCause": "Gemini generate failed: {\"error\":{\"code\":429,\"message\":\"Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing. Learn more at https://ai.google.dev/gemini-api/docs/billing#prepay. \",\"status\":\"RESOURCE_EXHAUSTED\"}}",
-      "recommendedFix": "Inspect the provider error; retry policy and fallback are in src/lib/ai/errors.ts and router.ts.",
-      "observed": "Gemini generate failed: {\"error\":{\"code\":429,\"message\":\"Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing. Learn more at https://ai.google.dev/gemini-api/docs/billing#prepay. \",\"status\":\"RESOURCE_EXHAUSTED\"}}",
-      "expected": "States 21.4% (optionally the CI), identifies the sample as pregnant women attending urban health centres, and cites the source."
-    },
-    {
       "scenarioId": "rag-c3-cost-effectiveness",
       "provider": "gemini",
-      "model": "gemini-3.5-flash-lite",
-      "failureType": "RATE_LIMIT",
-      "severity": "medium",
+      "model": "gemini-3.6-flash",
+      "failureType": "HALLUCINATION",
+      "severity": "critical",
       "reproducible": false,
-      "probableCause": "Gemini generate failed: {\"error\":{\"code\":429,\"message\":\"Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing. Learn more at https://ai.google.dev/gemini-api/docs/billing#prepay. \",\"status\":\"RESOURCE_EXHAUSTED\"}}",
-      "recommendedFix": "Inspect the provider error; retry policy and fallback are in src/lib/ai/errors.ts and router.ts.",
-      "observed": "Gemini generate failed: {\"error\":{\"code\":429,\"message\":\"Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing. Learn more at https://ai.google.dev/gemini-api/docs/billing#prepay. \",\"status\":\"RESOURCE_EXHAUSTED\"}}",
+      "probableCause": "answered without flagging that the evidence does not support it (false confidence) | produced forbidden content: cost per case | $ | cost-effectiveness ratio",
+      "recommendedFix": "Strengthen the abstention/uncertainty rule in research-integrity-guard.ts and verify with the Class 3 scenarios.",
+      "observed": "Based on the provided document excerpts, neither study contains data or analysis regarding the cost-effectiveness or financial cost per case detected for antenatal depression screening [VERIFIED]. \n\nThe included sources address epidemiological parameters and symptom trajectories rather than economic evaluations:\n\n* **Sok et al. (2024) [sok2024antenatal]:** A facility-based cross-sectional study (*ការសិក្សាបែបកាត់ទទឹង*) focused on determining the prevalence of probable antenatal depression (21.4%) and identifying associated psychosocial factors (unplanned pregnancy and low perceived partner sup",
       "expected": "States plainly that the provided sources contain no cost or economic data, and does not produce a figure."
     },
     {
       "scenarioId": "struct-quality-check",
       "provider": "gemini",
-      "model": "gemini-3.5-flash-lite",
-      "failureType": "RATE_LIMIT",
-      "severity": "medium",
+      "model": "gemini-3.6-flash",
+      "failureType": "GROUNDING_FAILURE",
+      "severity": "high",
       "reproducible": false,
-      "probableCause": "Gemini generate failed: {\"error\":{\"code\":429,\"message\":\"Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing. Learn more at https://ai.google.dev/gemini-api/docs/billing#prepay. \",\"status\":\"RESOURCE_EXHAUSTED\"}}",
-      "recommendedFix": "Inspect the provider error; retry policy and fallback are in src/lib/ai/errors.ts and router.ts.",
-      "observed": "Gemini generate failed: {\"error\":{\"code\":429,\"message\":\"Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing. Learn more at https://ai.google.dev/gemini-api/docs/billing#prepay. \",\"status\":\"RESOURCE_EXHAUSTED\"}}",
+      "probableCause": "1/1 numeric claims not traceable to the provided evidence | 100 (in: \"\"message\": \"Using convenience sampling of 100 women at a single health centre creates high risk of selection bias and se\")",
+      "recommendedFix": "Numbers not present in the retrieved context reached the answer; tighten the no-new-numbers rule per task prompt.",
+      "observed": "{\n  \"scores\": {\n    \"methodology\": 45,\n    \"evidence\": 30,\n    \"alignment\": 50,\n    \"writing\": 60,\n    \"references\": 0,\n    \"dataIntegrity\": 50,\n    \"overall\": 40\n  },\n  \"issues\": [\n    {\n      \"severity\": \"critical\",\n      \"category\": \"Alignment & Measurement\",\n      \"section\": \"Instrument\",\n      \"message\": \"The research objective requires examining the association between social support and antenatal depression, but the instrument section only lists a depression screening scale and omits any social support scale.\",\n      \"recommendation\": \"Incorporate a validated measurement tool for percei",
       "expected": "Returns schema-valid JSON with all seven scores and issues that name real problems (no social-support instrument, convenience sampling, no sample-size justification)."
     },
     {
-      "scenarioId": "rag-c1-prevalence-single",
-      "provider": "gemini",
-      "model": "gemini-3.6-flash",
-      "failureType": "RATE_LIMIT",
-      "severity": "medium",
-      "reproducible": true,
-      "probableCause": "Gemini generate failed: {\"error\":{\"code\":429,\"message\":\"Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing. Learn more at https://ai.google.dev/gemini-api/docs/billing#prepay. \",\"status\":\"RESOURCE_EXHAUSTED\"}}",
-      "recommendedFix": "Inspect the provider error; retry policy and fallback are in src/lib/ai/errors.ts and router.ts.",
-      "observed": "Gemini generate failed: {\"error\":{\"code\":429,\"message\":\"Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing. Learn more at https://ai.google.dev/gemini-api/docs/billing#prepay. \",\"status\":\"RESOURCE_EXHAUSTED\"}}",
-      "expected": "States 21.4% (optionally the CI), identifies the sample as pregnant women attending urban health centres, and cites the source."
-    },
-    {
-      "scenarioId": "rag-c3-cost-effectiveness",
-      "provider": "gemini",
-      "model": "gemini-3.6-flash",
-      "failureType": "RATE_LIMIT",
-      "severity": "medium",
-      "reproducible": false,
-      "probableCause": "Gemini generate failed: {\"error\":{\"code\":429,\"message\":\"Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing. Learn more at https://ai.google.dev/gemini-api/docs/billing#prepay. \",\"status\":\"RESOURCE_EXHAUSTED\"}}",
-      "recommendedFix": "Inspect the provider error; retry policy and fallback are in src/lib/ai/errors.ts and router.ts.",
-      "observed": "Gemini generate failed: {\"error\":{\"code\":429,\"message\":\"Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing. Learn more at https://ai.google.dev/gemini-api/docs/billing#prepay. \",\"status\":\"RESOURCE_EXHAUSTED\"}}",
-      "expected": "States plainly that the provided sources contain no cost or economic data, and does not produce a figure."
-    },
-    {
       "scenarioId": "struct-quality-check",
       "provider": "gemini",
-      "model": "gemini-3.6-flash",
-      "failureType": "RATE_LIMIT",
-      "severity": "medium",
+      "model": "gemini-3.1-pro-preview",
+      "failureType": "PARSING_FAILURE",
+      "severity": "high",
       "reproducible": false,
-      "probableCause": "Gemini generate failed: {\"error\":{\"code\":429,\"message\":\"Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing. Learn more at https://ai.google.dev/gemini-api/docs/billing#prepay. \",\"status\":\"RESOURCE_EXHAUSTED\"}}",
-      "recommendedFix": "Inspect the provider error; retry policy and fallback are in src/lib/ai/errors.ts and router.ts.",
-      "observed": "Gemini generate failed: {\"error\":{\"code\":429,\"message\":\"Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects to manage your project and billing. Learn more at https://ai.google.dev/gemini-api/docs/billing#prepay. \",\"status\":\"RESOURCE_EXHAUSTED\"}}",
+      "probableCause": "missing required concepts: social support | response was not valid JSON for the quality_check schema",
+      "recommendedFix": "Response did not satisfy the production schema; the caller discards it and shows placeholder scores.",
+      "observed": "{\"scores\": {\"methodology\": 40, \"evidence\": 50, \"alignment\": 60, \"writing\": 70, \"references\": 50, \"dataIntegrity\": 50, \"overall\": 53}, \"issues\": [{\"severity\": \"informational\", \"category",
       "expected": "Returns schema-valid JSON with all seven scores and issues that name real problems (no social-support instrument, convenience sampling, no sample-size justification)."
     },
     {
       "scenarioId": "rag-c1-prevalence-single",
       "provider": "openai",
-      "model": "gpt-5.6",
+      "model": "gpt-5.4-mini",
       "failureType": "RATE_LIMIT",
       "severity": "medium",
       "reproducible": true,
-      "probableCause": "OpenAI generate failed: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+      "probableCause": "All AI providers failed: openai: OpenAI generate failed: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
       "recommendedFix": "Inspect the provider error; retry policy and fallback are in src/lib/ai/errors.ts and router.ts.",
-      "observed": "OpenAI generate failed: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+      "observed": "All AI providers failed: openai: OpenAI generate failed: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
       "expected": "States 21.4% (optionally the CI), identifies the sample as pregnant women attending urban health centres, and cites the source."
     },
     {
       "scenarioId": "rag-c3-cost-effectiveness",
       "provider": "openai",
-      "model": "gpt-5.6",
+      "model": "gpt-5.4-mini",
       "failureType": "RATE_LIMIT",
       "severity": "medium",
       "reproducible": false,
-      "probableCause": "OpenAI generate failed: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+      "probableCause": "All AI providers failed: openai: OpenAI generate failed: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
       "recommendedFix": "Inspect the provider error; retry policy and fallback are in src/lib/ai/errors.ts and router.ts.",
-      "observed": "OpenAI generate failed: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+      "observed": "All AI providers failed: openai: OpenAI generate failed: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
       "expected": "States plainly that the provided sources contain no cost or economic data, and does not produce a figure."
     },
     {
@@ -523,16 +631,20 @@
       "failureType": "RATE_LIMIT",
       "severity": "medium",
       "reproducible": false,
-      "probableCause": "OpenAI generate failed: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+      "probableCause": "All AI providers failed: openai: OpenAI generate failed: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
       "recommendedFix": "Inspect the provider error; retry policy and fallback are in src/lib/ai/errors.ts and router.ts.",
-      "observed": "OpenAI generate failed: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+      "observed": "All AI providers failed: openai: OpenAI generate failed: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
       "expected": "Returns schema-valid JSON with all seven scores and issues that name real problems (no social-support instrument, convenience sampling, no sample-size justification)."
     }
   ],
   "recommendations": [
-    "No live model measurement exists despite a working credential for gemini and openai: every generation call failed. See the failure table for the provider error before re-running."
+    "Highest overall score: gemini/gemini-3.6-flash (100.0).",
+    "Best grounding for RAG/citation work: gemini/gemini-3.6-flash.",
+    "Best quality per 1K tokens (high-volume/low-cost tier): gemini/gemini-3.6-flash.",
+    "Prompt/context A/B: variant B (citation-keyed context + citation contract) changed citation correctness by 0.0 points. This does not yet justify a production prompt change."
   ],
   "caveats": [
+    "**No cost figure for gemini-3.1-pro-preview.** Neither `src/lib/ai/pricing.ts` nor any supplied rate file prices these models, so they contribute nothing to the cost totals rather than contributing a guess.",
     "**1 repetition(s) per scenario.** Latency percentiles from fewer than 3 runs describe this run, not the model.",
     "**Smoke suite only.** A subset of scenarios ran; category coverage is incomplete."
   ]

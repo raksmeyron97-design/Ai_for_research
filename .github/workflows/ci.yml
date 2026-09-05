@@ -1,0 +1,110 @@
+# Phase 21 §53, §54.
+#
+# There was no CI before this. Every gate — the suite, lint, typecheck, build,
+# the database isolation suites, the benchmark's artifact separation — existed
+# only as a command someone had to remember, and the Phase 21 audit found the
+# predictable consequence: migrations that had never been applied from clean,
+# and a dry benchmark that overwrote the live record every time the gate ran.
+#
+# What this deliberately does NOT do:
+#
+#   * it does not run the browser suite. §53 says not to add an expensive
+#     browser matrix the project cannot sustain, and this one needs a built
+#     app, a Supabase stack and a real Chrome — several minutes per run. It
+#     stays a local gate, and `docs/PHASE_21_*.md` says so rather than leaving
+#     a reader to assume CI covers it.
+#   * it does not run the live AI benchmark, ever. There is no provider key
+#     here and there must not be one: LIVE BENCHMARK = DEFERRED.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # The fast gates. Everything here runs without a database.
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit, integration and component tests
+        run: npm test
+
+      # No provider keys in the environment, deliberately. The build has to
+      # succeed without them, which is §44's "AI is optional" asserted by the
+      # gate rather than by a comment.
+      - name: Build without any AI provider credentials
+        run: npm run build
+
+  # §54: prove the dry benchmark cannot damage the live provider record.
+  #
+  # Its own job because it is the one gate whose failure mode is destroying
+  # committed evidence, and because it must be obvious in the checks list
+  # whether it ran.
+  benchmark-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # Hashes every live artifact, runs the real dry gate, hashes again, and
+      # additionally asserts 0 provider calls, mode=dry, and that every
+      # execution mode is MOCKED.
+      - name: Dry benchmark writes only its own artifacts
+        run: npm run ai:benchmark:verify-isolation
+
+      # Belt to that braces: even if the script's own checks were wrong, a
+      # modified live report would show up here as a dirty tree.
+      - name: The working tree is unchanged
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "The dry benchmark modified tracked files:"
+            git status --porcelain
+            git --no-pager diff --stat
+            exit 1
+          fi
+
+  # The gates that need a real Postgres. These are the ones that cannot be
+  # replaced by a mock, and the ones the Phase 21 audit found had drifted.
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # The central Phase 21 question, asked on a machine that has never seen
+      # this project: does an empty database plus the migrations in this
+      # repository produce a working schema, with no manual step?
+      - name: Bootstrap from an empty database
+        run: supabase start
+
+      - name: Every isolation suite, on that database
+        run: npm run db:verify:isolation:all
+
+      # Fails on a plan regression — a sequential scan over the library, or an
+      # N+1 collapsed into one statement — against a 150-source fixture.
+      - name: Query performance budgets
+        run: npm run db:profile

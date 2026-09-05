@@ -1,0 +1,663 @@
+{
+  "phase": 16,
+  "status": "NOT READY",
+  "benchmark_version": "16.0.0",
+  "run_id": "run_2026-09-05T15-31-53-902Z_db0df567",
+  "timestamp": "2026-09-05T15:33:22.281Z",
+  "commit": "a7797f9",
+  "suite": "smoke",
+  "mode": "live",
+  "provider_calls": 20,
+  "completeness": {
+    "status": "complete",
+    "plannedCalls": 12,
+    "skippedCalls": 0,
+    "reason": null
+  },
+  "execution_modes": {
+    "LIVE": 7,
+    "UNAVAILABLE": 4,
+    "DEGRADED": 1
+  },
+  "providers": {
+    "gemini": {
+      "provider": "gemini",
+      "credentialPresent": true,
+      "sdkVersion": "2.19.0",
+      "apiMode": "google-genai models.generateContent (Gemini Developer API)",
+      "reachable": true,
+      "status": "LIVE",
+      "discoveredModels": [
+        "antigravity-preview-05-2026",
+        "aqa",
+        "deep-research-max-preview-04-2026",
+        "deep-research-preview-04-2026",
+        "deep-research-pro-preview-12-2025",
+        "gemini-2.5-computer-use-preview-10-2025",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-image",
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-flash-native-audio-latest",
+        "gemini-2.5-flash-native-audio-preview-09-2025",
+        "gemini-2.5-flash-native-audio-preview-12-2025",
+        "gemini-2.5-flash-preview-tts",
+        "gemini-2.5-pro",
+        "gemini-2.5-pro-preview-tts",
+        "gemini-3-flash-preview",
+        "gemini-3-pro-image",
+        "gemini-3-pro-image-preview",
+        "gemini-3.1-flash-image",
+        "gemini-3.1-flash-image-preview",
+        "gemini-3.1-flash-lite",
+        "gemini-3.1-flash-lite-image",
+        "gemini-3.1-flash-lite-preview",
+        "gemini-3.1-flash-live-preview",
+        "gemini-3.1-flash-tts-preview",
+        "gemini-3.1-pro-preview",
+        "gemini-3.1-pro-preview-customtools",
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.5-live-translate-preview",
+        "gemini-3.5-transcribe",
+        "gemini-3.5-transcribe-live",
+        "gemini-3.6-flash",
+        "gemini-3.7-flash",
+        "gemini-3.8-flash",
+        "gemini-embedding-001",
+        "gemini-embedding-2",
+        "gemini-embedding-2-preview",
+        "gemini-flash-latest",
+        "gemini-flash-lite-latest",
+        "gemini-omni-1.1-flash",
+        "gemini-omni-flash-preview",
+        "gemini-pro-latest",
+        "gemini-robotics-er-2-preview",
+        "gemini-robotics-er-2-streaming-preview",
+        "gemma-4-26b-a4b-it",
+        "gemma-4-31b-it",
+        "lyria-3-clip-preview",
+        "lyria-3-pro-preview",
+        "lyria-3.5",
+        "nano-banana-pro-preview",
+        "veo-3.1-fast-generate-preview",
+        "veo-3.1-generate-preview",
+        "veo-3.1-lite-generate-preview"
+      ],
+      "reason": "Credential accepted; 54 models listed."
+    },
+    "openai": {
+      "provider": "openai",
+      "credentialPresent": true,
+      "sdkVersion": "7.8.0",
+      "apiMode": "openai responses.create (Responses API)",
+      "reachable": true,
+      "status": "LIVE",
+      "discoveredModels": [
+        "babbage-002",
+        "chat-latest",
+        "chatgpt-image-latest",
+        "davinci-002",
+        "gpt-3.5-turbo",
+        "gpt-3.5-turbo-0125",
+        "gpt-3.5-turbo-1106",
+        "gpt-3.5-turbo-16k",
+        "gpt-3.5-turbo-instruct",
+        "gpt-3.5-turbo-instruct-0914",
+        "gpt-4.1",
+        "gpt-4.1-2025-04-14",
+        "gpt-4.1-mini",
+        "gpt-4.1-mini-2025-04-14",
+        "gpt-4.1-nano",
+        "gpt-4.1-nano-2025-04-14",
+        "gpt-4o",
+        "gpt-4o-2024-05-13",
+        "gpt-4o-2024-08-06",
+        "gpt-4o-2024-11-20",
+        "gpt-4o-mini",
+        "gpt-4o-mini-2024-07-18",
+        "gpt-4o-mini-search-preview",
+        "gpt-4o-mini-search-preview-2025-03-11",
+        "gpt-4o-mini-transcribe",
+        "gpt-4o-mini-transcribe-2025-03-20",
+        "gpt-4o-mini-transcribe-2025-12-15",
+        "gpt-4o-mini-tts",
+        "gpt-4o-mini-tts-2025-03-20",
+        "gpt-4o-mini-tts-2025-12-15",
+        "gpt-4o-search-preview",
+        "gpt-4o-search-preview-2025-03-11",
+        "gpt-4o-transcribe",
+        "gpt-4o-transcribe-diarize",
+        "gpt-5",
+        "gpt-5-2025-08-07",
+        "gpt-5-chat-latest",
+        "gpt-5-codex",
+        "gpt-5-mini",
+        "gpt-5-mini-2025-08-07",
+        "gpt-5-nano",
+        "gpt-5-nano-2025-08-07",
+        "gpt-5-pro",
+        "gpt-5-pro-2025-10-06",
+        "gpt-5-search-api",
+        "gpt-5-search-api-2025-10-14",
+        "gpt-5.1",
+        "gpt-5.1-2025-11-13",
+        "gpt-5.1-chat-latest",
+        "gpt-5.1-codex",
+        "gpt-5.1-codex-max",
+        "gpt-5.1-codex-mini",
+        "gpt-5.2",
+        "gpt-5.2-2025-12-11",
+        "gpt-5.2-chat-latest",
+        "gpt-5.2-codex",
+        "gpt-5.2-pro",
+        "gpt-5.2-pro-2025-12-11",
+        "gpt-5.3-chat-latest",
+        "gpt-5.3-codex",
+        "gpt-5.4",
+        "gpt-5.4-2026-03-05",
+        "gpt-5.4-mini",
+        "gpt-5.4-mini-2026-03-17",
+        "gpt-5.4-nano",
+        "gpt-5.4-nano-2026-03-17",
+        "gpt-5.4-pro",
+        "gpt-5.4-pro-2026-03-05",
+        "gpt-5.5",
+        "gpt-5.5-2026-04-23",
+        "gpt-5.5-pro",
+        "gpt-5.5-pro-2026-04-23",
+        "gpt-5.6-luna",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+        "gpt-6-astra",
+        "gpt-audio",
+        "gpt-audio-1.5",
+        "gpt-audio-2025-08-28",
+        "gpt-audio-mini",
+        "gpt-audio-mini-2025-10-06",
+        "gpt-audio-mini-2025-12-15",
+        "gpt-image-1",
+        "gpt-image-1-mini",
+        "gpt-image-1.5",
+        "gpt-image-2",
+        "gpt-image-2-2026-04-21",
+        "gpt-live-transcribe",
+        "gpt-realtime",
+        "gpt-realtime-1.5",
+        "gpt-realtime-2",
+        "gpt-realtime-2.1",
+        "gpt-realtime-2.1-mini",
+        "gpt-realtime-2025-08-28",
+        "gpt-realtime-mini",
+        "gpt-realtime-mini-2025-12-15",
+        "gpt-realtime-translate",
+        "gpt-realtime-whisper",
+        "gpt-transcribe",
+        "o1",
+        "o1-2024-12-17",
+        "o3",
+        "o3-2025-04-16",
+        "o3-mini",
+        "o3-mini-2025-01-31",
+        "o4-mini",
+        "o4-mini-2025-04-16",
+        "omni-moderation-2024-09-26",
+        "omni-moderation-latest",
+        "sora-2",
+        "sora-2-pro",
+        "text-embedding-3-large",
+        "text-embedding-3-small",
+        "text-embedding-ada-002",
+        "tts-1",
+        "tts-1-1106",
+        "tts-1-hd",
+        "tts-1-hd-1106",
+        "whisper-1"
+      ],
+      "reason": "Credential accepted; 119 models listed. Configured model(s) not enumerated by this key's model list, benchmarked anyway (an unlisted id may still be a served alias): gpt-5.6."
+    }
+  },
+  "overall_scores": {
+    "gemini:gemini:gemini-3.6-flash:variantA": 66.86345615169144,
+    "routed:gemini:gemini-3.6-flash:variantB": 64.61538461538461,
+    "gemini:gemini:gemini-3.6-flash:variantB": 63.913574660633486,
+    "routed:gemini:gemini-3.6-flash:variantA": 53.2718355301987,
+    "routed:gemini:gemini-3.1-pro-preview:variantA": 50.00000000000001,
+    "openai:openai:gpt-5.4-mini:variantA": null,
+    "openai:openai:gpt-5.4-mini:variantB": null,
+    "openai:openai:gpt-5.6:variantA": null
+  },
+  "category_scores": {
+    "gemini:gemini:gemini-3.6-flash:variantA": {
+      "rag_grounding": 99.44751131221719,
+      "hallucination": 44.00000000000001,
+      "structured_output": 57.14285714285714
+    },
+    "routed:gemini:gemini-3.6-flash:variantB": {
+      "rag_grounding": 64.61538461538461
+    },
+    "gemini:gemini:gemini-3.6-flash:variantB": {
+      "rag_grounding": 63.913574660633486
+    },
+    "routed:gemini:gemini-3.6-flash:variantA": {
+      "rag_grounding": 64.22714932126696,
+      "hallucination": 42.316521739130444
+    },
+    "routed:gemini:gemini-3.1-pro-preview:variantA": {
+      "structured_output": 50.00000000000001
+    },
+    "openai:openai:gpt-5.4-mini:variantA": {},
+    "openai:openai:gpt-5.4-mini:variantB": {},
+    "openai:openai:gpt-5.6:variantA": {}
+  },
+  "latency": {
+    "gemini:gemini:gemini-3.6-flash:variantA": {
+      "n": 3,
+      "min": 5990,
+      "median": 8301,
+      "p95": 8411,
+      "max": 8411
+    },
+    "routed:gemini:gemini-3.6-flash:variantB": {
+      "n": 1,
+      "min": 8258,
+      "median": 8258,
+      "p95": 8258,
+      "max": 8258
+    },
+    "gemini:gemini:gemini-3.6-flash:variantB": {
+      "n": 1,
+      "min": 7442,
+      "median": 7442,
+      "p95": 7442,
+      "max": 7442
+    },
+    "routed:gemini:gemini-3.6-flash:variantA": {
+      "n": 2,
+      "min": 7475,
+      "median": 8258,
+      "p95": 9041,
+      "max": 9041
+    },
+    "routed:gemini:gemini-3.1-pro-preview:variantA": {
+      "n": 1,
+      "min": 34833,
+      "median": 34833,
+      "p95": 34833,
+      "max": 34833
+    },
+    "openai:openai:gpt-5.4-mini:variantA": {
+      "n": 0,
+      "min": 0,
+      "median": 0,
+      "p95": 0,
+      "max": 0
+    },
+    "openai:openai:gpt-5.4-mini:variantB": {
+      "n": 0,
+      "min": 0,
+      "median": 0,
+      "p95": 0,
+      "max": 0
+    },
+    "openai:openai:gpt-5.6:variantA": {
+      "n": 0,
+      "min": 0,
+      "median": 0,
+      "p95": 0,
+      "max": 0
+    }
+  },
+  "tokens": {
+    "gemini:gemini:gemini-3.6-flash:variantA": {
+      "medianInput": 713,
+      "medianOutput": 330,
+      "medianTotal": 974,
+      "medianReasoning": null,
+      "medianRetrievedContext": 248,
+      "providerReported": 3,
+      "estimated": 0
+    },
+    "routed:gemini:gemini-3.6-flash:variantB": {
+      "medianInput": 713,
+      "medianOutput": 170,
+      "medianTotal": 883,
+      "medianReasoning": null,
+      "medianRetrievedContext": 248,
+      "providerReported": 1,
+      "estimated": 0
+    },
+    "gemini:gemini:gemini-3.6-flash:variantB": {
+      "medianInput": 713,
+      "medianOutput": 217,
+      "medianTotal": 930,
+      "medianReasoning": null,
+      "medianRetrievedContext": 248,
+      "providerReported": 1,
+      "estimated": 0
+    },
+    "routed:gemini:gemini-3.6-flash:variantA": {
+      "medianInput": 793,
+      "medianOutput": 358.5,
+      "medianTotal": 1151.5,
+      "medianReasoning": null,
+      "medianRetrievedContext": 326.5,
+      "providerReported": 2,
+      "estimated": 0
+    },
+    "routed:gemini:gemini-3.1-pro-preview:variantA": {
+      "medianInput": 644,
+      "medianOutput": 70,
+      "medianTotal": 714,
+      "medianReasoning": null,
+      "medianRetrievedContext": 0,
+      "providerReported": 1,
+      "estimated": 0
+    },
+    "openai:openai:gpt-5.4-mini:variantA": {
+      "medianInput": null,
+      "medianOutput": null,
+      "medianTotal": null,
+      "medianReasoning": null,
+      "medianRetrievedContext": 0,
+      "providerReported": 0,
+      "estimated": 0
+    },
+    "openai:openai:gpt-5.4-mini:variantB": {
+      "medianInput": null,
+      "medianOutput": null,
+      "medianTotal": null,
+      "medianReasoning": null,
+      "medianRetrievedContext": 0,
+      "providerReported": 0,
+      "estimated": 0
+    },
+    "openai:openai:gpt-5.6:variantA": {
+      "medianInput": null,
+      "medianOutput": null,
+      "medianTotal": null,
+      "medianReasoning": null,
+      "medianRetrievedContext": 0,
+      "providerReported": 0,
+      "estimated": 0
+    }
+  },
+  "cost": {
+    "gemini:gemini:gemini-3.6-flash:variantA": {
+      "totalUsd": 0.015179999999999999,
+      "perRequestUsd": 0.005059999999999999,
+      "perSuccessUsd": 0.005059999999999999,
+      "rateSource": "verified_app_pricing"
+    },
+    "routed:gemini:gemini-3.6-flash:variantB": {
+      "totalUsd": 0.004011,
+      "perRequestUsd": 0.004011,
+      "perSuccessUsd": 0.004011,
+      "rateSource": "verified_app_pricing"
+    },
+    "gemini:gemini:gemini-3.6-flash:variantB": {
+      "totalUsd": 0.00422475,
+      "perRequestUsd": 0.00422475,
+      "perSuccessUsd": 0.00422475,
+      "rateSource": "verified_app_pricing"
+    },
+    "routed:gemini:gemini-3.6-flash:variantA": {
+      "totalUsd": 0.010470750000000001,
+      "perRequestUsd": 0.0052353750000000004,
+      "perSuccessUsd": 0.0052353750000000004,
+      "rateSource": "verified_app_pricing"
+    },
+    "routed:gemini:gemini-3.1-pro-preview:variantA": {
+      "totalUsd": null,
+      "perRequestUsd": null,
+      "perSuccessUsd": null,
+      "rateSource": "unknown_model"
+    },
+    "openai:openai:gpt-5.4-mini:variantA": {
+      "totalUsd": null,
+      "perRequestUsd": null,
+      "perSuccessUsd": null,
+      "rateSource": "unknown_model"
+    },
+    "openai:openai:gpt-5.4-mini:variantB": {
+      "totalUsd": null,
+      "perRequestUsd": null,
+      "perSuccessUsd": null,
+      "rateSource": "unknown_model"
+    },
+    "openai:openai:gpt-5.6:variantA": {
+      "totalUsd": null,
+      "perRequestUsd": null,
+      "perSuccessUsd": null,
+      "rateSource": "unknown_model"
+    }
+  },
+  "rag": {
+    "gemini:gemini:gemini-3.6-flash:variantA": {
+      "citation_precision": 1,
+      "citation_recall": 1,
+      "fabricated_citation_rate": 0.3333333333333333,
+      "unsupported_claim_rate": 0.3333333333333333,
+      "hallucination_rate": 1,
+      "abstention_accuracy": 1,
+      "by_answerability_class": {
+        "class_1": {
+          "n": 1,
+          "overall": 99.44751131221719,
+          "groundedness": 100,
+          "citationPrecision": 1,
+          "citationRecall": 1,
+          "abstentionAccuracy": null,
+          "unsupportedClaimRate": 0
+        },
+        "class_3": {
+          "n": 1,
+          "overall": 44.00000000000001,
+          "groundedness": 100,
+          "citationPrecision": null,
+          "citationRecall": null,
+          "abstentionAccuracy": 1,
+          "unsupportedClaimRate": 0
+        }
+      }
+    },
+    "routed:gemini:gemini-3.6-flash:variantB": {
+      "citation_precision": 0.5,
+      "citation_recall": 1,
+      "fabricated_citation_rate": 1,
+      "unsupported_claim_rate": 0,
+      "hallucination_rate": null,
+      "abstention_accuracy": null,
+      "by_answerability_class": {
+        "class_1": {
+          "n": 1,
+          "overall": 64.61538461538461,
+          "groundedness": 100,
+          "citationPrecision": 0.5,
+          "citationRecall": 1,
+          "abstentionAccuracy": null,
+          "unsupportedClaimRate": 0
+        }
+      }
+    },
+    "gemini:gemini:gemini-3.6-flash:variantB": {
+      "citation_precision": 0.5,
+      "citation_recall": 1,
+      "fabricated_citation_rate": 1,
+      "unsupported_claim_rate": 0,
+      "hallucination_rate": null,
+      "abstention_accuracy": null,
+      "by_answerability_class": {
+        "class_1": {
+          "n": 1,
+          "overall": 63.913574660633486,
+          "groundedness": 100,
+          "citationPrecision": 0.5,
+          "citationRecall": 1,
+          "abstentionAccuracy": null,
+          "unsupportedClaimRate": 0
+        }
+      }
+    },
+    "routed:gemini:gemini-3.6-flash:variantA": {
+      "citation_precision": 0.5,
+      "citation_recall": 1,
+      "fabricated_citation_rate": 1,
+      "unsupported_claim_rate": 0,
+      "hallucination_rate": 1,
+      "abstention_accuracy": 1,
+      "by_answerability_class": {
+        "class_1": {
+          "n": 1,
+          "overall": 64.22714932126696,
+          "groundedness": 100,
+          "citationPrecision": 0.5,
+          "citationRecall": 1,
+          "abstentionAccuracy": null,
+          "unsupportedClaimRate": 0
+        },
+        "class_3": {
+          "n": 1,
+          "overall": 42.316521739130444,
+          "groundedness": 100,
+          "citationPrecision": null,
+          "citationRecall": null,
+          "abstentionAccuracy": 1,
+          "unsupportedClaimRate": 0
+        }
+      }
+    },
+    "routed:gemini:gemini-3.1-pro-preview:variantA": {
+      "citation_precision": null,
+      "citation_recall": null,
+      "fabricated_citation_rate": 0,
+      "unsupported_claim_rate": 0,
+      "hallucination_rate": null,
+      "abstention_accuracy": null,
+      "by_answerability_class": {}
+    },
+    "openai:openai:gpt-5.4-mini:variantA": {
+      "citation_precision": null,
+      "citation_recall": null,
+      "fabricated_citation_rate": null,
+      "unsupported_claim_rate": null,
+      "hallucination_rate": null,
+      "abstention_accuracy": null,
+      "by_answerability_class": {}
+    },
+    "openai:openai:gpt-5.4-mini:variantB": {
+      "citation_precision": null,
+      "citation_recall": null,
+      "fabricated_citation_rate": null,
+      "unsupported_claim_rate": null,
+      "hallucination_rate": null,
+      "abstention_accuracy": null,
+      "by_answerability_class": {}
+    },
+    "openai:openai:gpt-5.6:variantA": {
+      "citation_precision": null,
+      "citation_recall": null,
+      "fabricated_citation_rate": null,
+      "unsupported_claim_rate": null,
+      "hallucination_rate": null,
+      "abstention_accuracy": null,
+      "by_answerability_class": {}
+    }
+  },
+  "failures": [
+    {
+      "scenarioId": "rag-c1-prevalence-single",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "failureType": "HALLUCINATION",
+      "severity": "critical",
+      "reproducible": true,
+      "probableCause": "fabricated citation keys: VERIFIED",
+      "recommendedFix": "Fabricated citation keys reached the output. verifyCitationKeys() would flag these as warnings post-hoc, but nothing blocks them — consider refusing to render unverified keys in the UI.",
+      "observed": "Based on the provided document excerpt [sok2024antenatal], the findings regarding prevalence and sample characteristics are as follows:\n\n* **Prevalence**: The prevalence of probable antenatal depression among the surveyed population was **21.4%** (95% CI 18.2–24.9) [VERIFIED].\n* **Sample**: The measurement was conducted in a sample of **612 pregnant women in their second and third trimesters** who were attending four urban health centres [VERIFIED].\n\n### Additional Context on Methodology\nThe data were collected as part of a facility-based cross-sectional study (ការសិក្សាបែបកាត់ទទឹង [Cross-sect",
+      "expected": "States 21.4% (optionally the CI), identifies the sample as pregnant women attending urban health centres, and cites the source."
+    },
+    {
+      "scenarioId": "rag-c3-cost-effectiveness",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "failureType": "HALLUCINATION",
+      "severity": "critical",
+      "reproducible": true,
+      "probableCause": "produced forbidden content: cost per case",
+      "recommendedFix": "Fabricated citation keys reached the output. verifyCitationKeys() would flag these as warnings post-hoc, but nothing blocks them — consider refusing to render unverified keys in the UI.",
+      "observed": "Based on the provided document excerpts, there is no data or information regarding the cost-effectiveness of antenatal depression screening or the cost per case detected [VERIFIED]. \n\nThe provided sources focus exclusively on prevalence, associated psychosocial factors, and symptom trajectories:\n\n1. **Sok et al. (2024) [sok2024antenatal]** examines the prevalence of probable antenatal depression (21.4%) and its associated factors (unplanned pregnancy, aOR 1.92; low perceived partner support, aOR 2.34) among 612 pregnant women using a 10-item screening scale in a cross-sectional design [USER_PR",
+      "expected": "States plainly that the provided sources contain no cost or economic data, and does not produce a figure."
+    },
+    {
+      "scenarioId": "struct-quality-check",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "failureType": "GROUNDING_FAILURE",
+      "severity": "high",
+      "reproducible": false,
+      "probableCause": "1/1 numeric claims not traceable to the provided evidence | 100 (in: \"{\"scores\":{\"methodology\":45,\"evidence\":30,\"alignment\":50,\"writing\":60,\"references\":20,\"dataIntegrity\":50,\"overall\":42},\"\")",
+      "recommendedFix": "Numbers not present in the retrieved context reached the answer; tighten the no-new-numbers rule per task prompt.",
+      "observed": "{\"scores\":{\"methodology\":45,\"evidence\":30,\"alignment\":50,\"writing\":60,\"references\":20,\"dataIntegrity\":50,\"overall\":42},\"issues\":[{\"severity\":\"critical\",\"category\":\"Alignment\",\"section\":\"Instrument\",\"message\":\"The second objective requires examining the association with social support, but no instrument or scale for measuring social support is specified in the protocol.\",\"recommendation\":\"Integrate a validated social support measurement tool, such as the Multidimensional Scale of Perceived Social Support (MSPSS), alongside the depression screening tool.\"},{\"severity\":\"high\",\"category\":\"Methodol",
+      "expected": "Returns schema-valid JSON with all seven scores and issues that name real problems (no social-support instrument, convenience sampling, no sample-size justification)."
+    },
+    {
+      "scenarioId": "struct-quality-check",
+      "provider": "gemini",
+      "model": "gemini-3.1-pro-preview",
+      "failureType": "PARSING_FAILURE",
+      "severity": "high",
+      "reproducible": false,
+      "probableCause": "response was not valid JSON for the quality_check schema",
+      "recommendedFix": "Response did not satisfy the production schema; the caller discards it and shows placeholder scores.",
+      "observed": "{\"scores\":{\"methodology\":40,\"evidence\":30,\"alignment\":50,\"writing\":50,\"references\":0,\"dataIntegrity\":40,\"overall\":35},\"issues\":[{\"severity\":\"critical\",\"category\":\"Alignment\",\"section\":\"Instrument\",\"message\":\"Missing measurement tool for the social support variable. The objectives state an intention",
+      "expected": "Returns schema-valid JSON with all seven scores and issues that name real problems (no social-support instrument, convenience sampling, no sample-size justification)."
+    },
+    {
+      "scenarioId": "rag-c1-prevalence-single",
+      "provider": "openai",
+      "model": "gpt-5.4-mini",
+      "failureType": "RATE_LIMIT",
+      "severity": "medium",
+      "reproducible": true,
+      "probableCause": "All AI providers failed: openai: OpenAI generate failed: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+      "recommendedFix": "Inspect the provider error; retry policy and fallback are in src/lib/ai/errors.ts and router.ts.",
+      "observed": "All AI providers failed: openai: OpenAI generate failed: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+      "expected": "States 21.4% (optionally the CI), identifies the sample as pregnant women attending urban health centres, and cites the source."
+    },
+    {
+      "scenarioId": "rag-c3-cost-effectiveness",
+      "provider": "openai",
+      "model": "gpt-5.4-mini",
+      "failureType": "RATE_LIMIT",
+      "severity": "medium",
+      "reproducible": false,
+      "probableCause": "All AI providers failed: openai: OpenAI generate failed: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+      "recommendedFix": "Inspect the provider error; retry policy and fallback are in src/lib/ai/errors.ts and router.ts.",
+      "observed": "All AI providers failed: openai: OpenAI generate failed: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+      "expected": "States plainly that the provided sources contain no cost or economic data, and does not produce a figure."
+    },
+    {
+      "scenarioId": "struct-quality-check",
+      "provider": "openai",
+      "model": "gpt-5.6",
+      "failureType": "RATE_LIMIT",
+      "severity": "medium",
+      "reproducible": false,
+      "probableCause": "All AI providers failed: openai: OpenAI generate failed: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+      "recommendedFix": "Inspect the provider error; retry policy and fallback are in src/lib/ai/errors.ts and router.ts.",
+      "observed": "All AI providers failed: openai: OpenAI generate failed: 429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.",
+      "expected": "Returns schema-valid JSON with all seven scores and issues that name real problems (no social-support instrument, convenience sampling, no sample-size justification)."
+    }
+  ],
+  "recommendations": [
+    "Highest overall score: gemini/gemini-3.6-flash (66.9).",
+    "Best grounding for RAG/citation work: gemini/gemini-3.6-flash.",
+    "Best quality per 1K tokens (high-volume/low-cost tier): gemini/gemini-3.6-flash.",
+    "Prompt/context A/B: variant B (citation-keyed context + citation contract) changed citation correctness by -50.0 points. This does not yet justify a production prompt change."
+  ],
+  "caveats": [
+    "**No cost figure for gemini-3.1-pro-preview.** Neither `src/lib/ai/pricing.ts` nor any supplied rate file prices these models, so they contribute nothing to the cost totals rather than contributing a guess.",
+    "**1 repetition(s) per scenario.** Latency percentiles from fewer than 3 runs describe this run, not the model.",
+    "**Smoke suite only.** A subset of scenarios ran; category coverage is incomplete."
+  ]
+}

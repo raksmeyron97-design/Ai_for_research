@@ -1,11 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import ItemMethodologyEditor from "@/components/ItemMethodologyEditor";
 import type {
   QuestionnaireQuestionRow,
+  ResearchConstructRow,
+  ResearchIndicatorRow,
   ResearchInstrumentRow,
+  ResearchScaleRow,
   ValidationStatus,
 } from "@/lib/db/types";
+import type { MappingProposal } from "@/lib/methodology/suggestions";
 
 const VALIDATION_STYLE: Record<ValidationStatus, string> = {
   validated: "bg-green-100 text-green-700",
@@ -27,6 +32,34 @@ export default function QuestionnaireBuilder({ projectId }: { projectId: string 
   const [error, setError] = useState<string | null>(null);
   /** Reused across a manual retry after a failed attempt (see the route's idempotency handling) so a retry can never create a second instrument — cleared only once a generation actually succeeds. */
   const pendingGenerateKeyRef = useRef<string | null>(null);
+
+  /**
+   * Phase 18 §22: the methodology model an item can be mapped to. Loaded once
+   * an instrument is opened rather than with the instrument list — a researcher
+   * browsing their questionnaires has no use for it yet.
+   */
+  const [constructs, setConstructs] = useState<ResearchConstructRow[]>([]);
+  const [indicators, setIndicators] = useState<ResearchIndicatorRow[]>([]);
+  const [scales, setScales] = useState<ResearchScaleRow[]>([]);
+  const [mappingFor, setMappingFor] = useState<string | null>(null);
+  const [mappingSuggestions, setMappingSuggestions] = useState<MappingProposal[] | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const methodologyBase = `/api/research/projects/${projectId}/methodology`;
+
+  const loadMethodology = useCallback(async () => {
+    try {
+      const res = await fetch(methodologyBase);
+      if (!res.ok) return;
+      const { model } = await res.json();
+      setConstructs(model.constructs ?? []);
+      setIndicators(model.indicators ?? []);
+      setScales(model.scales ?? []);
+    } catch {
+      // The questionnaire is still fully usable without the mapping options —
+      // failing to load them must not take the builder down with it.
+    }
+  }, [methodologyBase]);
 
   async function loadInstruments() {
     setLoading(true);
@@ -74,7 +107,50 @@ export default function QuestionnaireBuilder({ projectId }: { projectId: string 
     }
   }
 
+  async function updateItemMapping(itemId: string, patch: Record<string, unknown>) {
+    setBusy(true);
+    try {
+      const res = await fetch(`${methodologyBase}/items/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error("That change could not be saved.");
+      const { item } = await res.json();
+      setSelected((prev) =>
+        prev ? { ...prev, questions: prev.questions.map((q) => (q.id === item.id ? item : q)) } : prev,
+      );
+      setError(null);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function suggestMapping(itemId: string) {
+    setBusy(true);
+    setMappingFor(itemId);
+    try {
+      const res = await fetch(`${methodologyBase}/suggest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "item_mapping", itemId }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error ?? "That suggestion could not be produced.");
+      setMappingSuggestions(payload.proposals ?? []);
+      setError(null);
+    } catch (err) {
+      setError((err as Error).message);
+      setMappingSuggestions(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function openInstrument(id: string) {
+    void loadMethodology();
     const res = await fetch(`/api/research/projects/${projectId}/instruments/${id}`);
     if (res.ok) setSelected(await res.json());
   }
@@ -189,6 +265,48 @@ export default function QuestionnaireBuilder({ projectId }: { projectId: string 
                     {q.options && q.options.length > 0 && (
                       <p className="mt-1 text-xs text-neutral-400">Options: {q.options.join(", ")}</p>
                     )}
+                    <ItemMethodologyEditor
+                      item={q}
+                      constructs={constructs}
+                      indicators={indicators}
+                      scales={scales}
+                      busy={busy}
+                      onChange={(patch) => updateItemMapping(q.id, patch)}
+                      onSuggestMapping={suggestMapping}
+                      suggestions={mappingFor === q.id ? mappingSuggestions : null}
+                      onAcceptSuggestion={async (proposal) => {
+                        await updateItemMapping(q.id, {
+                          constructId: proposal.constructId,
+                          indicatorId: proposal.indicatorId,
+                        });
+                        setMappingSuggestions(null);
+                        await fetch(`${methodologyBase}/decisions`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            entityType: "questionnaire_item",
+                            entityId: q.id,
+                            accepted: true,
+                            summary: "Accepted a suggested item mapping",
+                            proposal,
+                          }),
+                        }).catch(() => undefined);
+                      }}
+                      onRejectSuggestion={async (proposal) => {
+                        setMappingSuggestions((prev) => (prev ?? []).filter((p) => p !== proposal));
+                        await fetch(`${methodologyBase}/decisions`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            entityType: "questionnaire_item",
+                            entityId: q.id,
+                            accepted: false,
+                            summary: "Rejected a suggested item mapping",
+                            proposal,
+                          }),
+                        }).catch(() => undefined);
+                      }}
+                    />
                   </li>
                 ))}
               </ol>

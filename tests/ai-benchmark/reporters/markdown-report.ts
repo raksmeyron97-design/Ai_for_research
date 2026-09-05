@@ -42,8 +42,23 @@ function providerTable(statuses: ProviderStatus[]): string {
 export function renderMarkdown(report: BenchmarkReport, summaries: ModelSummary[]): string {
   const lines: string[] = [];
 
-  lines.push("# AI Benchmark — latest run");
+  lines.push(
+    report.mode === "dry" ? "# AI Benchmark — DRY RUN (MOCKED)" : "# AI Benchmark — latest run",
+  );
   lines.push("");
+  // Phase 21 §10: the first thing a reader sees has to be what the numbers
+  // are, not what they say. A mocked table and a measured table are the same
+  // table, and this document gets pasted into other documents.
+  if (report.mode === "dry") {
+    lines.push(
+      "> **These numbers are MOCKED.** Every result came from the deterministic stub " +
+        "provider; no provider was contacted and nothing here measures a model. This " +
+        "artifact exists to prove the harness runs, and must never be quoted as a " +
+        "benchmark result.",
+    );
+    lines.push("");
+  }
+  lines.push(`- **Mode:** ${report.mode === "dry" ? "DRY (mocked, 0 provider calls)" : "LIVE"}`);
   lines.push(`- **Status:** ${report.status}`);
   lines.push(`- **Run:** \`${report.run_id}\` (suite: ${report.suite}, benchmark v${report.benchmark_version})`);
   lines.push(`- **Commit:** ${report.commit ?? "unknown"}`);

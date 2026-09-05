@@ -52,15 +52,42 @@ describe("updateQuestion / deleteQuestion", () => {
     const { client, fromCalls } = createSupabaseMock({
       tableResults: { questionnaire_questions: { data: { id: "q1" }, error: null } },
     });
-    await updateQuestion(client, "q1", { required: false });
+    await updateQuestion(client, "p1", "q1", { required: false });
     const updateCall = fromCalls[0].builder.calls.find((c) => c.method === "update");
     expect(updateCall?.args[0]).toEqual({ required: false });
+  });
+
+  // Phase 18 §27: an item id is not authorisation. Both mutations filter on
+  // the project too, so RLS is not the only thing between an id and another
+  // project's questionnaire.
+  it("updateQuestion filters on the project as well as the id", async () => {
+    const { client, fromCalls } = createSupabaseMock({
+      tableResults: { questionnaire_questions: { data: { id: "q1" }, error: null } },
+    });
+    await updateQuestion(client, "p1", "q1", { required: false });
+    const eqCalls = fromCalls[0].builder.calls.filter((c) => c.method === "eq");
+    expect(eqCalls.map((c) => c.args)).toEqual([
+      ["id", "q1"],
+      ["project_id", "p1"],
+    ]);
+  });
+
+  it("deleteQuestion filters on the project as well as the id", async () => {
+    const { client, fromCalls } = createSupabaseMock({
+      tableResults: { questionnaire_questions: { data: null, error: null } },
+    });
+    await deleteQuestion(client, "p1", "q1");
+    const eqCalls = fromCalls[0].builder.calls.filter((c) => c.method === "eq");
+    expect(eqCalls.map((c) => c.args)).toEqual([
+      ["id", "q1"],
+      ["project_id", "p1"],
+    ]);
   });
 
   it("deleteQuestion throws DbError on failure", async () => {
     const { client } = createSupabaseMock({
       tableResults: { questionnaire_questions: { data: null, error: { message: "denied" } } },
     });
-    await expect(deleteQuestion(client, "q1")).rejects.toThrow(DbError);
+    await expect(deleteQuestion(client, "p1", "q1")).rejects.toThrow(DbError);
   });
 });

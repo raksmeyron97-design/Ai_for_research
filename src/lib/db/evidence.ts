@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DbError, toDbError } from "./errors";
 import type {
+  ClaimType,
   ResearchClaimEvidenceInsert,
   ResearchClaimEvidenceRow,
   ResearchClaimInsert,
@@ -104,6 +105,22 @@ export async function listClaimEvidence(
   return data as ResearchClaimEvidenceRow[];
 }
 
+/** The links for one claim — the minimum needed to derive that claim's status. */
+export async function listClaimEvidenceForClaim(
+  supabase: SupabaseClient,
+  projectId: string,
+  claimId: string,
+): Promise<ResearchClaimEvidenceRow[]> {
+  const { data, error } = await supabase
+    .from("research_claim_evidence")
+    .select("*")
+    .eq("project_id", projectId)
+    .eq("claim_id", claimId);
+
+  if (error) throw toDbError(error, "listClaimEvidenceForClaim");
+  return data as ResearchClaimEvidenceRow[];
+}
+
 /**
  * Recomputes a claim's status from its links and persists it.
  *
@@ -116,18 +133,21 @@ export async function refreshClaimStatus(
   projectId: string,
   claimId: string,
 ): Promise<ResearchClaimRow> {
-  const [claims, links] = await Promise.all([
-    listClaims(supabase, projectId),
-    listClaimEvidence(supabase, projectId),
+  // Fetches this claim and this claim's links, not the project's. The first
+  // version read every claim and every relation in the project to answer a
+  // question about one of them, which is exactly the pattern §38 rules out —
+  // and this runs on every evidence insertion.
+  const [claim, links] = await Promise.all([
+    getClaim(supabase, projectId, claimId),
+    listClaimEvidenceForClaim(supabase, projectId, claimId),
   ]);
 
-  const claim = claims.find((c) => c.id === claimId);
   // notFound=true so the API layer answers 404 rather than 500 — a claim that
   // belongs to another project is invisible under RLS and reaches here the
   // same way a deleted one does.
   if (!claim) throw new DbError(`refreshClaimStatus: claim ${claimId} not found`, true);
 
-  const supports = links.filter((l) => l.claim_id === claimId).map((l) => l.support as SupportLabel);
+  const supports = links.map((l) => l.support as SupportLabel);
   const status = deriveClaimStatus(claim.claim_type, supports);
 
   const { data, error } = await supabase
@@ -140,4 +160,121 @@ export async function refreshClaimStatus(
 
   if (error) throw toDbError(error, "refreshClaimStatus");
   return data as ResearchClaimRow;
+}
+
+/**
+ * One claim, scoped by project (§34). The project filter is not redundant
+ * with RLS: it is what makes a claim id from another project read as "not
+ * found" here rather than depending on a policy to hide it.
+ */
+export async function getClaim(
+  supabase: SupabaseClient,
+  projectId: string,
+  claimId: string,
+): Promise<ResearchClaimRow | null> {
+  const { data, error } = await supabase
+    .from("research_claims")
+    .select("*")
+    .eq("id", claimId)
+    .eq("project_id", projectId)
+    .maybeSingle();
+
+  if (error) throw toDbError(error, "getClaim");
+  return data as ResearchClaimRow | null;
+}
+
+/**
+ * Edits a claim before evidence is searched for it (§11: claims are editable
+ * before evidence search).
+ *
+ * `needs_evidence` and `evidence_status` are re-derived from the type rather
+ * than accepted from the caller, for the same reason `createClaims` derives
+ * them: they are a function of the type, and a caller able to set them
+ * independently is how a claim ends up marked SUPPORTED before anything
+ * supports it. Editing the type of a claim that already has links resets it to
+ * the type's initial status; the next `refreshClaimStatus` re-derives from the
+ * links.
+ */
+export async function updateClaim(
+  supabase: SupabaseClient,
+  projectId: string,
+  claimId: string,
+  patch: { claim_text?: string; claim_type?: ClaimType },
+): Promise<ResearchClaimRow> {
+  const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (patch.claim_text !== undefined) update.claim_text = patch.claim_text;
+  if (patch.claim_type !== undefined) {
+    update.claim_type = patch.claim_type;
+    update.needs_evidence = claimNeedsEvidence(patch.claim_type);
+    update.evidence_status = initialStatusFor(patch.claim_type);
+  }
+
+  const { data, error } = await supabase
+    .from("research_claims")
+    .update(update)
+    .eq("id", claimId)
+    .eq("project_id", projectId)
+    .select("*")
+    .single();
+
+  if (error) throw toDbError(error, "updateClaim");
+  return data as ResearchClaimRow;
+}
+
+export async function deleteClaim(
+  supabase: SupabaseClient,
+  projectId: string,
+  claimId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from("research_claims")
+    .delete()
+    .eq("id", claimId)
+    .eq("project_id", projectId);
+
+  if (error) throw toDbError(error, "deleteClaim");
+}
+
+export async function getEvidenceByIds(
+  supabase: SupabaseClient,
+  projectId: string,
+  evidenceIds: string[],
+): Promise<ResearchEvidenceRow[]> {
+  if (evidenceIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("research_evidence")
+    .select("*")
+    .eq("project_id", projectId)
+    .in("id", evidenceIds);
+
+  if (error) throw toDbError(error, "getEvidenceByIds");
+  return data as ResearchEvidenceRow[];
+}
+
+/**
+ * Records the support judgement a researcher made when previewing evidence
+ * (§15), and — when the citation was actually written into the section —
+ * where and when (§18).
+ */
+export async function updateClaimEvidence(
+  supabase: SupabaseClient,
+  projectId: string,
+  relationId: string,
+  patch: {
+    support?: SupportLabel;
+    note?: string | null;
+    inserted_into_section?: SectionType | null;
+    inserted_at?: string | null;
+  },
+): Promise<ResearchClaimEvidenceRow> {
+  const { data, error } = await supabase
+    .from("research_claim_evidence")
+    .update(patch)
+    .eq("id", relationId)
+    .eq("project_id", projectId)
+    .select("*")
+    .single();
+
+  if (error) throw toDbError(error, "updateClaimEvidence");
+  return data as ResearchClaimEvidenceRow;
 }

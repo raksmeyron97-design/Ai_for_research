@@ -1,4 +1,4 @@
-import { extractCitationKeys } from "@/lib/ai/integrity-guard";
+import { extractCitationKeys, isResearchIntegrityLabel } from "@/lib/ai/integrity-guard";
 import { allKnownCitationKeys } from "../fixtures/corpus";
 import type { BenchmarkScenario, CitationMetrics, EvaluationDetail } from "../types";
 
@@ -15,6 +15,13 @@ import type { BenchmarkScenario, CitationMetrics, EvaluationDetail } from "../ty
  * Bracket tokens that are formatting rather than citations (`[1]`, `[i]`,
  * `[Note]`) are filtered out; production's own extractor does not do this,
  * which is itself a finding rather than something to paper over here.
+ *
+ * The claim labels rule 3 of the system instruction requires (`[VERIFIED]`,
+ * `[INFERENCE]`, ...) are excluded by `extractCitationKeys` itself since
+ * Phase 22 — they are not filtered here, because the fix belongs in
+ * production and not in the thing measuring it. The first live run scored
+ * five of eight executions as critical citation fabrication for emitting
+ * them, on answers that were otherwise entirely correct.
  */
 const NON_CITATION_TOKENS = /^(?:\d+|[ivxIVX]+|note|sic|Note|citation_key|key|source|ref|A|B)$/;
 
@@ -24,7 +31,7 @@ export function evaluateCitations(
 ): { metrics: CitationMetrics; detail: EvaluationDetail } {
   const known = allKnownCitationKeys();
   const raw = extractCitationKeys(output);
-  const cited = raw.filter((k) => !NON_CITATION_TOKENS.test(k));
+  const cited = raw.filter((k) => !NON_CITATION_TOKENS.test(k) && !isResearchIntegrityLabel(k));
 
   const expected = scenario.expect.mustCite ?? [];
   const forbidden = scenario.expect.mustNotCite ?? [];

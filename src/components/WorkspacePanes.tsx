@@ -3,102 +3,170 @@
 import { useState, type ReactNode } from "react";
 
 /**
- * Phase 17 §24, closing Phase 16 gap #4.
+ * Phase 17 §24 / Phase 17B §30.
  *
- * Desktop keeps the three-pane grid exactly as it was — §24 is explicit that
- * the existing desktop workflow must not break, and a researcher working on a
- * laptop should see no change at all.
+ * Desktop keeps the three-column grid: Navigator | Editor | aside. Phase 17B
+ * adds three more panes (Review, Evidence, History) and they all live in the
+ * aside column as an inner tab group, because a fifth and sixth column is not
+ * a layout — it is four unreadable columns.
  *
- * Below `lg` the same three children become tabs. Tabs rather than a
- * drawer-over-drawer because the panes are peers, not a hierarchy: on a phone
- * a researcher is either navigating, writing, or asking — never usefully doing
- * two at once in 375px. Crucially all three stay mounted, so switching tabs
- * does not discard editor state or an in-flight AI suggestion; they are
- * hidden with `hidden`, not unmounted.
+ * Below `lg` every pane becomes a tab in one row: Sections → Editor → Review →
+ * Evidence → AI → History. Tabs rather than a drawer-over-drawer because the
+ * panes are peers, not a hierarchy: on a phone a researcher is either
+ * navigating, writing, reviewing or asking — never usefully doing two at once
+ * in 375px.
+ *
+ * **One DOM tree, not two.** Rendering a mobile layout beside a desktop layout
+ * and hiding one with CSS duplicates every interactive control and every id
+ * inside the panes — two editors, two AI panels — which assistive technology
+ * reads twice and which breaks label association. So panes render once and
+ * only their visibility is responsive.
+ *
+ * **Panes stay mounted.** Switching tabs never discards editor text, an AI
+ * suggestion waiting for review, or a half-finished evidence preview. They are
+ * hidden with a class, not unmounted — which is also why no business logic is
+ * duplicated for mobile: there is only one of each pane.
  */
-export type PaneId = "navigator" | "editor" | "assistant";
+export type PaneRegion = "navigator" | "editor" | "aside";
 
-const TABS: { id: PaneId; label: string }[] = [
-  { id: "navigator", label: "Sections" },
-  { id: "editor", label: "Editor" },
-  { id: "assistant", label: "AI Assist" },
-];
+export interface WorkspacePane {
+  id: string;
+  label: string;
+  region: PaneRegion;
+  node: ReactNode;
+}
+
+function Tablist({
+  id,
+  label,
+  panes,
+  active,
+  onSelect,
+  className,
+}: {
+  id: string;
+  label: string;
+  panes: WorkspacePane[];
+  active: string;
+  onSelect: (paneId: string) => void;
+  className: string;
+}) {
+  return (
+    <div role="tablist" aria-label={label} className={className}>
+      {panes.map((pane) => (
+        <button
+          key={pane.id}
+          type="button"
+          role="tab"
+          id={`${id}-tab-${pane.id}`}
+          aria-selected={active === pane.id}
+          aria-controls={`pane-panel-${pane.id}`}
+          // Only the active tab is in the tab order; arrow keys move between
+          // them, which is the expected tablist pattern.
+          tabIndex={active === pane.id ? 0 : -1}
+          onClick={() => onSelect(pane.id)}
+          onKeyDown={(e) => {
+            if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+            e.preventDefault();
+            const i = panes.findIndex((p) => p.id === active);
+            const next = e.key === "ArrowRight" ? (i + 1) % panes.length : (i - 1 + panes.length) % panes.length;
+            onSelect(panes[next].id);
+            document.getElementById(`${id}-tab-${panes[next].id}`)?.focus();
+          }}
+          className={`flex-1 whitespace-nowrap px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-neutral-900 ${
+            active === pane.id
+              ? "border-b-2 border-neutral-900 font-medium text-neutral-900"
+              : "text-neutral-500"
+          }`}
+        >
+          {pane.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function WorkspacePanes({
-  navigator,
-  editor,
-  assistant,
+  panes,
+  activeAside,
+  onAsideChange,
 }: {
-  navigator: ReactNode;
-  editor: ReactNode;
-  assistant: ReactNode;
+  panes: WorkspacePane[];
+  /** Controlled by the parent so a review issue can switch the aside to Evidence (§27). */
+  activeAside: string;
+  onAsideChange: (paneId: string) => void;
 }) {
-  const [active, setActive] = useState<PaneId>("editor");
+  const [activeMobile, setActiveMobile] = useState<string>(
+    () => panes.find((p) => p.region === "editor")?.id ?? panes[0]?.id ?? "",
+  );
 
-  const panes: Record<PaneId, ReactNode> = { navigator, editor, assistant };
+  const asidePanes = panes.filter((p) => p.region === "aside");
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/*
-        One DOM tree, not two. Rendering a mobile layout and a desktop layout
-        side by side and letting CSS hide one duplicates every interactive
-        control and every id inside the panes — two editors, two AI panels —
-        which assistive technology reads twice and which breaks label
-        association. So the panes are rendered once and only their visibility
-        is responsive.
-      */}
-      <div role="tablist" aria-label="Workspace panes" className="flex border-b border-neutral-200 lg:hidden">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            id={`pane-tab-${tab.id}`}
-            aria-selected={active === tab.id}
-            aria-controls={`pane-panel-${tab.id}`}
-            // Only the active tab is in the tab order; arrow keys move between
-            // them, which is the expected tablist pattern.
-            tabIndex={active === tab.id ? 0 : -1}
-            onClick={() => setActive(tab.id)}
-            onKeyDown={(e) => {
-              if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-              e.preventDefault();
-              const i = TABS.findIndex((t) => t.id === active);
-              const next = e.key === "ArrowRight" ? (i + 1) % TABS.length : (i - 1 + TABS.length) % TABS.length;
-              setActive(TABS[next].id);
-              document.getElementById(`pane-tab-${TABS[next].id}`)?.focus();
-            }}
-            className={`flex-1 px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-neutral-900 ${
-              active === tab.id
-                ? "border-b-2 border-neutral-900 font-medium text-neutral-900"
-                : "text-neutral-500"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <Tablist
+        id="mobile"
+        label="Workspace panes"
+        panes={panes}
+        active={activeMobile}
+        onSelect={setActiveMobile}
+        className="flex overflow-x-auto border-b border-neutral-200 lg:hidden"
+      />
 
-      <div className="min-h-0 flex-1 lg:grid lg:grid-cols-[220px_1fr_360px]">
-        {TABS.map((tab) => (
-          <div
-            key={tab.id}
-            role="tabpanel"
-            id={`pane-panel-${tab.id}`}
-            aria-labelledby={`pane-tab-${tab.id}`}
-            // Inactive panes stay MOUNTED and are hidden with a class, so
-            // switching tabs never discards editor text or an AI suggestion
-            // waiting for review. On desktop every pane is shown and the
-            // original three-column grid is unchanged.
-            className={`min-h-0 overflow-y-auto lg:block lg:overflow-visible ${
-              active === tab.id ? "block h-full" : "hidden"
-            } ${tab.id === "navigator" ? "lg:border-r lg:border-neutral-200" : ""} ${
-              tab.id === "assistant" ? "lg:border-l lg:border-neutral-200" : ""
-            }`}
-          >
-            {panes[tab.id]}
-          </div>
-        ))}
+      <div className="min-h-0 flex-1 lg:grid lg:grid-cols-[220px_1fr_380px]">
+        {panes
+          .filter((p) => p.region !== "aside")
+          .map((pane) => (
+            <div
+              key={pane.id}
+              role="tabpanel"
+              id={`pane-panel-${pane.id}`}
+              aria-labelledby={`mobile-tab-${pane.id}`}
+              // `flex flex-col`, not `block`. A pane's content sizes itself
+              // with `flex-1` so the editor fills its column; inside a block
+              // parent that does nothing, and the editor collapsed to its
+              // content height — a 72px textarea in an 827px column, at every
+              // width including desktop. Caught by measuring a real layout;
+              // jsdom reports the classes either way.
+              className={`flex min-h-0 flex-col overflow-y-auto lg:flex lg:overflow-visible ${
+                activeMobile === pane.id ? "h-full" : "hidden lg:flex"
+              } ${pane.region === "navigator" ? "lg:border-r lg:border-neutral-200" : ""}`}
+            >
+              {pane.node}
+            </div>
+          ))}
+
+        <div
+          className={`min-h-0 flex-col lg:flex lg:border-l lg:border-neutral-200 ${
+            asidePanes.some((p) => p.id === activeMobile) ? "flex h-full" : "hidden"
+          }`}
+        >
+          <Tablist
+            id="aside"
+            label="Assistant panes"
+            panes={asidePanes}
+            active={activeAside}
+            onSelect={onAsideChange}
+            // The inner tab row is desktop-only: on mobile these panes are
+            // already reachable from the main row, and a second row of tabs
+            // above them would be the same choice offered twice.
+            className="hidden border-b border-neutral-200 lg:flex"
+          />
+
+          {asidePanes.map((pane) => (
+            <div
+              key={pane.id}
+              role="tabpanel"
+              id={`pane-panel-${pane.id}`}
+              aria-labelledby={`mobile-tab-${pane.id}`}
+              className={`min-h-0 flex-col overflow-y-auto ${
+                activeMobile === pane.id ? "flex h-full" : "hidden"
+              } ${activeAside === pane.id ? "lg:flex lg:h-full" : "lg:hidden"}`}
+            >
+              {pane.node}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

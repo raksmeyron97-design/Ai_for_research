@@ -207,22 +207,61 @@ describe("the benchmark's live record is protected (§11, §54)", () => {
   });
 
   it("does not describe the committed record as a completed live benchmark", () => {
-    // §12/§61: the artifact is a successful credential probe plus a smoke run
-    // whose every call came back UNAVAILABLE. Documentation must not imply
-    // otherwise, and the README has to keep saying so.
+    // §12/§61, rewritten in Phase 22 because the fact it asserted stopped
+    // being true: a live smoke run completed and produced scored executions.
+    //
+    // Until then this read "no scored executions exist", which is a fact
+    // about a moment rather than a property worth protecting. What actually
+    // needs protecting is that the README describes whatever is in the file —
+    // so the test now compares the two, and fails on either kind of drift:
+    // a completed run the README still calls deferred, or a README claiming a
+    // full benchmark that the artifact does not contain.
     const readme = read("reports/ai-benchmark/README.md");
-    expect(readme).toMatch(/LIVE BENCHMARK = DEFERRED/);
-
     const report = JSON.parse(read("reports/ai-benchmark/latest.json")) as {
+      suite: string;
       execution_modes: Record<string, number>;
     };
-    const scored = Object.entries(report.execution_modes).filter(
-      ([mode]) => mode !== "UNAVAILABLE" && mode !== "MOCKED",
-    );
+    const scored = Object.entries(report.execution_modes)
+      .filter(([mode]) => mode !== "UNAVAILABLE" && mode !== "MOCKED")
+      .reduce((total, [, n]) => total + n, 0);
+
+    if (scored === 0) {
+      expect(
+        readme,
+        "nothing scored has ever run, so the README must still say so",
+      ).toMatch(/LIVE BENCHMARK\s+= (DEFERRED|NOT MEASURED)/);
+      return;
+    }
+
+    // Something scored. The README must not still call it deferred...
     expect(
-      scored,
-      "the committed report now contains real scored executions — update the README's claim",
-    ).toEqual([]);
+      readme,
+      "the committed report contains scored executions but the README calls the live benchmark deferred",
+    ).not.toMatch(/LIVE BENCHMARK = DEFERRED/);
+
+    // ...and a smoke run must not be described as the benchmark. A smoke run
+    // is a wiring check over three scenarios; quoting it as a measurement of
+    // model quality is the exact confusion this file exists to prevent.
+    if (report.suite !== "full") {
+      expect(
+        readme,
+        `latest.json is suite "${report.suite}", so AI quality is not measured and the README must say so`,
+      ).toMatch(/AI QUALITY\s+= NOT MEASURED/);
+    }
+  });
+
+  it("keeps the live report that a live run replaced", () => {
+    // Phase 22 §22D. `writeReport` overwrites latest.json in place and its
+    // per-run copy lands in gitignored raw/, so before the archive step the
+    // only committed trace of a live run was destroyed by the next one.
+    const report = JSON.parse(read("reports/ai-benchmark/latest.json")) as { mode?: string };
+    if (report.mode !== "live") return;
+
+    const archived = tracked().filter((f) => /^reports\/ai-benchmark\/archive\/.*\.json$/.test(f));
+    expect(
+      archived.length,
+      "a live report is committed but no predecessor is archived — archiveExistingLiveReport did not run",
+    ).toBeGreaterThan(0);
   });
 });
 

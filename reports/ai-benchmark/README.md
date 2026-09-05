@@ -21,31 +21,63 @@ readers of this repository:
 > `providers.json` listing 52 Gemini models and 118 OpenAI models means a key
 > was accepted. It says nothing about whether a single scenario completed.
 
-## Status of the committed record, as of Phase 21
+## Status of the committed record, as of Phase 22
 
-**No live benchmark has ever completed. `LIVE BENCHMARK = DEFERRED`.**
+**A live run has completed. It is a smoke run, and its quality scores are not
+usable as a measurement.** Both halves of that matter.
 
-`latest.json` is the closest thing that exists, and read carefully it is
-category 1 plus a *failed* category 2:
+`latest.json` is `run_2026-09-05T15-31-53-902Z_db0df567`: suite `smoke`,
+`mode: "live"`, 20 provider calls, `completeness: complete`. Its execution
+modes are `LIVE: 7`, `DEGRADED: 1`, `UNAVAILABLE: 4`. That is the first time
+in this project's history that any scenario produced a scored live result, and
+it is category 2 in the table above — a wiring check — not category 3.
 
-```json
-"suite": "smoke",
-"providers": { "gemini": { "status": "LIVE", ... }, "openai": { "status": "LIVE", ... } },
-"execution_modes": { "UNAVAILABLE": 12 },
-"status": "NOT READY"
+What it establishes:
+
+* **Gemini is reachable and billable.** Seven scored executions, cost priced
+  from `src/lib/ai/pricing.ts` at $0.034 for the run.
+* **OpenAI is still blocked, and the blocker is named in the artifact:**
+  `429 You have no credits remaining.` Every OpenAI execution is UNAVAILABLE.
+  No OpenAI quality number exists, and none may be inferred.
+* **Cross-provider fallback works under a real outage.** The one `DEGRADED`
+  execution is the routed group failing over from OpenAI to Gemini and
+  returning an answer. That is production recovery behaviour, observed rather
+  than asserted.
+
+Why the scores may not be quoted: the run's own citation metrics are
+corrupted by a bug it found. `research-integrity-guard.ts` rule 3 requires the
+model to label claims `[VERIFIED]`, `[INFERENCE]` and so on; the citation
+verifier read those labels as citation keys, and reported them to the
+researcher as `high` severity fabricated citations. Five of the eight scored
+executions carry it. It drove `fabricated_citation_rate` to 1.0, halved
+`citation_precision`, and produced the A/B line claiming variant B "changed
+citation correctness by -50.0 points". The underlying answers were correct —
+right prevalence, right confidence interval, right source.
+
+The bug is fixed in `src/lib/ai/integrity-guard.ts` as of Phase 22. **This
+artifact is preserved as it was written (§61) and is not rescored**, because
+it is the evidence that the bug existed in production. A re-run after the fix
+would be a different run and gets a different file.
+
+So, precisely:
+
+```
+LIVE SMOKE      = COMPLETED (2026-09-05), Gemini only
+LIVE BENCHMARK  = NOT MEASURED
+AI QUALITY      = NOT MEASURED
+OPENAI          = BLOCKED (no credits)
 ```
 
-`status: "LIVE"` on a provider means **the credential probe succeeded** — the
-key was accepted and models were enumerated. `execution_modes` is the line
-that says what happened next: all **12 of 12** scenario calls came back
-`UNAVAILABLE`, i.e. no scenario produced a scored result. Provider billing
-credit is the blocker, as it has been since Phase 16B.
+### The record this replaced
 
-This file is preserved exactly as it was written (§61). It is real evidence of
-a real attempt, and it is labelled here for what it is rather than rewritten
-to look tidier or deleted to look cleaner.
+`archive/run_2026-09-01T11-19-35-444Z_a2266530.json` is the Phase 16B attempt:
+`"execution_modes": {"UNAVAILABLE": 12}` — a credential probe that succeeded
+and twelve scenarios that all failed to produce a result, on provider billing.
 
-Every other run recorded under `raw/` is `"MOCKED": 765` — a dry run.
+It is archived rather than overwritten because until Phase 22 a live run
+destroyed its predecessor: `writeReport` wrote `latest.json` in place and its
+per-run copy went to `raw/`, which is gitignored. `archive/` is committed, and
+`archiveExistingLiveReport` fills it before any live write.
 
 ## The dry/live split
 

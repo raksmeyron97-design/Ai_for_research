@@ -56,15 +56,19 @@ which triggered the `pull_request` workflow on GitHub's own runners.
 | `benchmark-artifacts` | `ai:benchmark:verify-isolation`, working tree unchanged | success |
 | `database` | `supabase start` from empty, all isolation suites, `db:profile` | success |
 
-A second run confirmed it on the final commit, after every fix in this phase:
+It has run three times on this branch, green every time:
 
-| | |
-| --- | --- |
-| Run | `33977742902` |
-| Commit | `c9d287a` |
-| Result | **success — all three jobs** |
+| Run | Commit | Result |
+| --- | --- | --- |
+| `33974855541` | `526e5da` (branch as opened) | success — all three jobs |
+| `33977742902` | `c9d287a` (after every code fix) | success — all three jobs |
+| `33978092814` | `5799905` (all code and evidence) | success — all three jobs |
 
-So CI is green both on the branch as opened and on the branch as delivered.
+A note on the last row, because it is the honest version of a small
+circularity: recording a CI result in a document changes the commit, so the
+run named here is the one on the commit *before* this sentence was written.
+The commit that adds this sentence changes markdown only — no source, no
+test, no workflow — and its own run is visible on the pull request.
 
 ### What CI execution actually settled
 
@@ -442,7 +446,7 @@ removes a false warning; it does not remove a true one.
 | Phase 17 / 17B / 18 / 19 / 20 / 21 isolation | **PASS** (all executed) |
 | `npm run db:profile` | all budgets met |
 | `npm audit` | **0 vulnerabilities** |
-| **CI workflow** | **PASS — executed on a GitHub-hosted runner**, run `33974855541`, all three jobs |
+| **CI workflow** | **PASS — executed on a GitHub-hosted runner**, three runs, all three jobs each |
 | Live Gemini calls | 40 across two smoke runs, \$0.070 |
 | Live OpenAI calls | 0 scored — `429 no credits remaining` |
 
